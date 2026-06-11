@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Region model and an isolated, feature-gated game-key provider, plus a
+  written specification of the save-data encryption scheme, as groundwork for
+  `SECURE.BIN` decryption.
 - `PARAM.SFO` parser and writer with a byte-identical round-trip guarantee,
   typed accessors for string and integer entries, and bounded setters for
   save titles and descriptions.
