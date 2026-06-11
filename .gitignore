@@ -1,0 +1,9 @@
+# Build artifacts
+/target
+
+# Personal save files used for local integration testing — never committed.
+# See CONTRIBUTING.md and the PTPNHEX_SAVES_DIR environment variable.
+SAVEDATA/
+
+# Backup files produced by the editor
+*.bak
