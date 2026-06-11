@@ -1,0 +1,48 @@
+name: Bug report
+description: Something does not work as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please do **not** attach your save files to a public issue unless a
+        maintainer asks for them, and never attach saves that are not yours.
+  - type: input
+    id: version
+    attributes:
+      label: PTPNHEX version
+      placeholder: "0.1.0, or commit hash for source builds"
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "Windows 11, macOS 15, Ubuntu 24.04 ..."
+    validations:
+      required: true
+  - type: input
+    id: serial
+    attributes:
+      label: Game region / serial
+      placeholder: "EU / UCES00995"
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: Steps to reproduce, what you edited, and what you expected instead.
+    validations:
+      required: true
+  - type: dropdown
+    id: target
+    attributes:
+      label: Where was the save tested?
+      options:
+        - PPSSPP
+        - Real PSP hardware
+        - Both
+        - Not applicable
+    validations:
+      required: true

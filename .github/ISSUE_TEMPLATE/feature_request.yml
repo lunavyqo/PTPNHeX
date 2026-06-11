@@ -1,0 +1,18 @@
+name: Feature request
+description: Suggest an improvement or a new editing capability
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would you like to be able to do?
+      description: Describe the feature from a user's point of view.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Anything that helps, e.g. which save field or game mechanic is involved.
+    validations:
+      required: false

@@ -1,0 +1,25 @@
+[workspace]
+resolver = "2"
+members = ["crates/ptpnhex-core", "crates/ptpnhex-cli", "crates/ptpnhex-gui"]
+# The GUI crate is excluded from default builds so that day-to-day
+# `cargo build`/`cargo test` stay fast; CI builds the full workspace.
+default-members = ["crates/ptpnhex-core", "crates/ptpnhex-cli"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/lunavyqo/PTPNHEX"
+rust-version = "1.85"
+
+[workspace.dependencies]
+ptpnhex-core = { path = "crates/ptpnhex-core" }
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+thiserror = "2"
+
+[workspace.lints.rust]
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+unwrap_used = "warn"

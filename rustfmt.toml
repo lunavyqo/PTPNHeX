@@ -1,0 +1,2 @@
+# Standard rustfmt defaults; committed to pin the project's formatting intent.
+edition = "2021"

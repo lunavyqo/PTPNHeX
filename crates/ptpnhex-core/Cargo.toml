@@ -1,0 +1,20 @@
+[package]
+name = "ptpnhex-core"
+description = "Save-data parsing, cryptography, and editing model for the PTPNHEX save editor"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[features]
+default = ["embedded-keys"]
+# Compiles the built-in game-key table into the library. Disable to build a
+# binary that only accepts keys supplied at runtime.
+embedded-keys = []
+
+[dependencies]
+thiserror.workspace = true
+
+[lints]
+workspace = true
