@@ -5,7 +5,9 @@
 //! decryption, and a typed editing model over the decrypted save payload.
 //! The `ptpnhex-cli` and `ptpnhex-gui` crates are thin layers over this API.
 
+pub mod codec;
 pub mod error;
+pub mod sfo;
 
 pub use error::Error;
 

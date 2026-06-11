@@ -9,5 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `PARAM.SFO` parser and writer with a byte-identical round-trip guarantee,
+  typed accessors for string and integer entries, and bounded setters for
+  save titles and descriptions.
 - Project scaffolding: Cargo workspace with `ptpnhex-core`, `ptpnhex-cli`, and
   `ptpnhex-gui` crates, continuous integration, and contribution guidelines.
