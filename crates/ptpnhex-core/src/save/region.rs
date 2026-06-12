@@ -27,6 +27,15 @@ impl Region {
         }
     }
 
+    /// Detects the region from a save directory name (for example
+    /// `"UCES00995_DATA01"`), matching the leading serial. Returns `None` if
+    /// no known serial is a prefix.
+    pub fn detect(dir_name: &str) -> Option<Self> {
+        [Region::Europe, Region::NorthAmerica, Region::Japan]
+            .into_iter()
+            .find(|r| dir_name.starts_with(r.serial()))
+    }
+
     /// The canonical save serial for this region.
     pub fn serial(self) -> &'static str {
         match self {

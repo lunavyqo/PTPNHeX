@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `SaveSlot` container that opens a save directory, decrypts it for editing,
+  and writes it back — re-encrypting, regenerating the integrity hashes, and
+  backing up the originals to `*.bak`. The Patapon EU game key is embedded, so
+  opening a European save needs no setup.
 - Mode-5 `SECURE.BIN` cryptography in `ptpnhex-core::crypto`: the keystream
   cipher (decrypt and encrypt) and the AES-CMAC integrity hashes, verified
   byte-for-byte against a real save corpus through opt-in integration tests.

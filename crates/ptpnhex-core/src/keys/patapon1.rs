@@ -16,9 +16,12 @@ use crate::save::Region;
 
 /// Europe (`UCES00995`).
 ///
-/// Pending: fill in once dumped and confirmed by the `SECURE.BIN` round-trip
-/// test against the local save corpus.
-const EUROPE: Option<GameKey> = None;
+/// The per-title game key, identical across every copy of the game. Confirmed
+/// by the `SECURE.BIN` round-trip and hash-reproduction tests over the save
+/// corpus.
+const EUROPE: Option<GameKey> = Some([
+    0x01, 0xAF, 0x6F, 0x00, 0x02, 0x00, 0x70, 0xD5, 0x2E, 0x24, 0x12, 0xC7, 0xE1, 0xFF, 0x83, 0xBA,
+]);
 
 /// North America (`UCUS98632`). Pending.
 const NORTH_AMERICA: Option<GameKey> = None;

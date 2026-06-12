@@ -13,6 +13,11 @@ pub enum Error {
         reason: String,
     },
 
+    /// The save uses a region or feature this build cannot handle (for
+    /// example an unrecognized serial, or a region with no available key).
+    #[error("unsupported: {0}")]
+    Unsupported(String),
+
     /// An underlying I/O operation failed.
     #[error(transparent)]
     Io(#[from] std::io::Error),

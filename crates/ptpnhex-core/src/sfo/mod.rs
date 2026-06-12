@@ -136,6 +136,14 @@ impl ParamSfo {
         self.entries.iter().find(|e| e.key == key)
     }
 
+    /// Absolute byte offset of an entry's value within [`ParamSfo::to_bytes`]
+    /// output. Useful for patching fixed-position fields (such as the
+    /// integrity hashes) after serialization.
+    pub fn data_offset(&self, key: &str) -> Option<usize> {
+        let e = self.get(key)?;
+        Some(self.data_table_start as usize + e.data_offset as usize)
+    }
+
     /// Returns a string value ([`DataFormat::Utf8`] entries only).
     pub fn get_str(&self, key: &str) -> Option<&str> {
         let e = self.get(key)?;
