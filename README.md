@@ -50,6 +50,14 @@ backed up to `*.bak` first):
 ptpnhex set-kaching path/to/UCES00995_DATA01 99999
 ```
 
+List crafting materials, or set one (or all of them) — counts cap at 99:
+
+```sh
+ptpnhex materials path/to/UCES00995_DATA01
+ptpnhex set-material path/to/UCES00995_DATA01 hard-alloy 99
+ptpnhex set-material path/to/UCES00995_DATA01 all 99
+```
+
 More fields are added as they are reverse-engineered (see
 [docs/save-format.md](docs/save-format.md)). Run `ptpnhex --help` for the full
 command list.
