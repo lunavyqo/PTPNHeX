@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Materials editing: `SaveSlot::material` / `materials` / `set_material` over
+  the reverse-engineered inventory list, with all 20 crafting materials mapped
+  by item id. Editing a material already present in the save is supported
+  (capped at 99); inserting a never-obtained one is not yet.
 - `ptpnhex` command-line interface with `info` (region, save title/detail, and
   ka-ching) and `set-kaching` (write a new value, backing up the originals).
 - Ka-ching (currency) editing: `SaveSlot::kaching` / `set_kaching`, backed by a

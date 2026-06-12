@@ -122,6 +122,62 @@ impl SaveSlot {
         Ok(())
     }
 
+    /// The count of `material` in this save (`0` if the player has never
+    /// obtained it, in which case it is absent from the inventory list).
+    pub fn material(&self, material: crate::save::Material) -> u32 {
+        match self.material_offset(material) {
+            Some(off) => u16::from_le_bytes([self.data[off], self.data[off + 1]]) as u32,
+            None => 0,
+        }
+    }
+
+    /// Every material with its current count, in canonical order.
+    pub fn materials(&self) -> Vec<(crate::save::Material, u32)> {
+        crate::save::Material::all()
+            .map(|m| (m, self.material(m)))
+            .collect()
+    }
+
+    /// Sets the count of `material` (capped at
+    /// [`crate::save::materials::MATERIAL_MAX`]).
+    ///
+    /// Only materials already present in the save can be edited; setting one
+    /// the player has never obtained is not yet supported and returns an
+    /// error. Any reasonably progressed save lists all materials (even at
+    /// count zero).
+    pub fn set_material(&mut self, material: crate::save::Material, count: u32) -> Result<()> {
+        use crate::save::materials::MATERIAL_MAX;
+        if count > MATERIAL_MAX {
+            return Err(Error::Unsupported(format!(
+                "material count {count} exceeds the maximum of {MATERIAL_MAX}"
+            )));
+        }
+        let off = self.material_offset(material).ok_or_else(|| {
+            Error::Unsupported(format!(
+                "{} is not present in this save and cannot be added yet",
+                material.name()
+            ))
+        })?;
+        self.data[off..off + 2].copy_from_slice(&(count as u16).to_le_bytes());
+        Ok(())
+    }
+
+    /// Finds the offset of a material's count `u16` by scanning the inventory
+    /// region for its item id.
+    fn material_offset(&self, material: crate::save::Material) -> Option<usize> {
+        let region = crate::save::layout::inventory_region(self.region)?;
+        let end = region.end.min(self.data.len());
+        let id = material.item_id().to_le_bytes();
+        let mut off = region.start;
+        while off + 4 <= end {
+            if self.data[off + 2] == id[0] && self.data[off + 3] == id[1] {
+                return Some(off);
+            }
+            off += 4;
+        }
+        None
+    }
+
     /// The parsed `PARAM.SFO` metadata.
     pub fn sfo(&self) -> &ParamSfo {
         &self.sfo

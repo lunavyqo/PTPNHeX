@@ -4,6 +4,8 @@
 //! Editing accessors live on [`crate::SaveSlot`].
 
 pub mod layout;
+pub mod materials;
 mod region;
 
+pub use materials::Material;
 pub use region::Region;

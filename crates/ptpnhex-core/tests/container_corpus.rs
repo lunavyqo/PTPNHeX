@@ -177,3 +177,52 @@ fn set_kaching_round_trips_through_disk() {
     fs::remove_dir_all(&root).ok();
     eprintln!("ka-ching edit round-tripped through disk");
 }
+
+#[test]
+fn materials_match_confirmed_values() {
+    use ptpnhex_core::save::Material;
+    let Some(dir) = saves_dir() else {
+        eprintln!("skipped: set PTPNHEX_SAVES_DIR");
+        return;
+    };
+    // Player-confirmed material counts for DATA46, in canonical (item-id) order.
+    let expected = [
+        29, 21, 20, 7, 57, 11, 19, 0, 1, 70, 23, 13, 1, 41, 11, 3, 20, 13, 8, 0,
+    ];
+    let save = dir.join("UCES00995_DATA46");
+    let slot = SaveSlot::open(&save, &KeyProvider::Embedded).unwrap();
+    let got: Vec<u32> = slot.materials().into_iter().map(|(_, c)| c).collect();
+    assert_eq!(got, expected, "materials mismatch for DATA46");
+    // Every full save reads all 20 in range without panicking.
+    assert_eq!(Material::all().count(), 20);
+    eprintln!("materials matched confirmed values for DATA46");
+}
+
+#[test]
+fn set_material_round_trips_through_disk() {
+    use ptpnhex_core::save::Material;
+    let Some(dir) = saves_dir() else {
+        eprintln!("skipped: set PTPNHEX_SAVES_DIR");
+        return;
+    };
+    let root = temp_root("materials");
+    // DATA46 lists all materials, so any is editable in place.
+    let work = working_copy(&dir.join("UCES00995_DATA46"), &root);
+    let stone = Material::from_slug("stone").unwrap();
+    {
+        let mut slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        assert_eq!(slot.material(stone), 57);
+        slot.set_material(stone, 99).unwrap();
+        slot.save_without_backup().unwrap();
+    }
+    let slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+    assert_eq!(slot.material(stone), 99);
+    // Other materials are untouched.
+    assert_eq!(
+        slot.material(Material::from_slug("cherry-tree").unwrap()),
+        70
+    );
+
+    fs::remove_dir_all(&root).ok();
+    eprintln!("material edit round-tripped through disk");
+}

@@ -61,6 +61,41 @@ saves and finding the offset that uniquely held each value (`DATA01` = 564,
 `DATA50` = 598). It behaves like currency across the whole corpus — it rises and
 falls and never exceeds the game's 99999 cap.
 
+## The inventory list (materials and items)
+
+Obtained items are stored as a **variable-length list**, not at fixed offsets.
+Each entry is a `u32`:
+
+```
+count : u16 (LE)      item id : u16 (LE)
+```
+
+The list holds only items the player has obtained, in acquisition order (not
+sorted), so a given item sits at a different offset in every save and is found
+by scanning for its item id. For Europe the list is scanned within
+`0x19000..0x1A0E0` (after the unit/equipment array, before ka-ching), a range
+verified to contain no false material matches across the corpus.
+
+### Materials
+
+The 20 crafting materials are the inventory entries whose item id is
+`(0x13..=0x26) << 8 | 0x01` — that is `0x1301`, `0x1401`, … `0x2601`, in this
+order:
+
+| ids           | materials                                               |
+| ------------- | ------------------------------------------------------- |
+| `0x13`–`0x16` | Leather Meat, Tender Meat, Dream Meat, Mystery Meat     |
+| `0x17`–`0x1A` | Stone, Hard Iron, Tytanium Ore, Mytheerial              |
+| `0x1B`–`0x1E` | Banal Branch, Cherry Tree, Hinoki, Super Cedar          |
+| `0x1F`–`0x22` | Eyeball Cabbage, Crying Carrot, Predator Pumpkin, Hazy Shroom |
+| `0x23`–`0x26` | Sloppy Alloy, Hard Alloy, Awesome Alloy, Magic Alloy    |
+
+Counts display two-digit, so they are capped at 99. Confirmed against all 20
+material amounts read from one save (`DATA46`). A material the player has never
+obtained is simply absent from the list (common in early saves); the editor can
+change materials that are present (every progressed save lists all 20, even at
+count 0) but cannot yet insert a brand-new one.
+
 ## How fields are confirmed
 
 Two complementary methods:

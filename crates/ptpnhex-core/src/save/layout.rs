@@ -20,3 +20,15 @@ pub fn kaching_offset(region: Region) -> Option<usize> {
         Region::NorthAmerica | Region::Japan => None,
     }
 }
+
+/// Byte range of the inventory list (where material entries are scanned for).
+///
+/// Confirmed for Europe as `0x19000..0x1A0E0` — after the unit/equipment
+/// array and before [`kaching_offset`]; verified to contain no false material
+/// matches across the save corpus.
+pub fn inventory_region(region: Region) -> Option<std::ops::Range<usize>> {
+    match region {
+        Region::Europe => Some(0x19000..0x1A0E0),
+        Region::NorthAmerica | Region::Japan => None,
+    }
+}
