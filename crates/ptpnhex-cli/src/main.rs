@@ -1,14 +1,97 @@
 //! `ptpnhex` — command-line interface for the PTPNHEX save editor.
 
-use clap::Parser;
+use std::path::{Path, PathBuf};
+
+use anyhow::{Context, Result};
+use clap::{Parser, Subcommand};
+use ptpnhex_core::keys::KeyProvider;
+use ptpnhex_core::SaveSlot;
 
 /// Save editor for Patapon (PSP).
 #[derive(Parser)]
 #[command(name = "ptpnhex", version, about, long_about = None)]
-struct Cli {}
+struct Cli {
+    #[command(subcommand)]
+    command: Command,
+}
 
-fn main() -> anyhow::Result<()> {
-    let _cli = Cli::parse();
-    println!("ptpnhex: no commands implemented yet; see --help");
+#[derive(Subcommand)]
+enum Command {
+    /// Show information about a save directory.
+    Info {
+        /// Path to the save directory (for example `.../UCES00995_DATA01`).
+        dir: PathBuf,
+    },
+    /// Set the ka-ching (currency) value and write the save back.
+    SetKaching {
+        /// Path to the save directory.
+        dir: PathBuf,
+        /// New ka-ching value (0–99999).
+        value: u32,
+        /// Do not write `*.bak` backups of the originals.
+        #[arg(long)]
+        no_backup: bool,
+    },
+}
+
+fn main() -> Result<()> {
+    match Cli::parse().command {
+        Command::Info { dir } => info(&dir),
+        Command::SetKaching {
+            dir,
+            value,
+            no_backup,
+        } => set_kaching(&dir, value, no_backup),
+    }
+}
+
+fn open(dir: &Path) -> Result<SaveSlot> {
+    SaveSlot::open(dir, &KeyProvider::Embedded)
+        .with_context(|| format!("opening save {}", dir.display()))
+}
+
+fn info(dir: &Path) -> Result<()> {
+    let slot = open(dir)?;
+    println!("Region:   {}", slot.region().serial());
+    if let Some(title) = slot.sfo().get_str("SAVEDATA_TITLE") {
+        println!("Title:    {title}");
+    }
+    if let Some(detail) = slot.sfo().get_str("SAVEDATA_DETAIL") {
+        println!("Detail:   {}", detail.trim().replace('\n', " / "));
+    }
+    match slot.kaching() {
+        Some(k) => println!("Ka-ching: {k}"),
+        None => println!("Ka-ching: (not mapped for this region/save)"),
+    }
     Ok(())
+}
+
+fn set_kaching(dir: &Path, value: u32, no_backup: bool) -> Result<()> {
+    let mut slot = open(dir)?;
+    let before = slot.kaching();
+    slot.set_kaching(value)?;
+    if no_backup {
+        slot.save_without_backup()?;
+    } else {
+        slot.save()?;
+    }
+    match before {
+        Some(old) => println!("Ka-ching: {old} -> {value}"),
+        None => println!("Ka-ching set to {value}"),
+    }
+    if !no_backup {
+        println!("Originals backed up to *.bak");
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::CommandFactory;
+
+    #[test]
+    fn cli_definition_is_valid() {
+        Cli::command().debug_assert();
+    }
 }

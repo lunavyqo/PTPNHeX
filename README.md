@@ -37,7 +37,22 @@ cargo build --release -p ptpnhex-cli
 
 ## Usage
 
-To be documented as features land. See `ptpnhex --help`.
+Inspect a save directory:
+
+```sh
+ptpnhex info path/to/UCES00995_DATA01
+```
+
+Set the ka-ching (currency) value and write the save back (the originals are
+backed up to `*.bak` first):
+
+```sh
+ptpnhex set-kaching path/to/UCES00995_DATA01 99999
+```
+
+More fields are added as they are reverse-engineered (see
+[docs/save-format.md](docs/save-format.md)). Run `ptpnhex --help` for the full
+command list.
 
 ## Save-file safety
 

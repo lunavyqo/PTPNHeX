@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `ptpnhex` command-line interface with `info` (region, save title/detail, and
+  ka-ching) and `set-kaching` (write a new value, backing up the originals).
 - Ka-ching (currency) editing: `SaveSlot::kaching` / `set_kaching`, backed by a
   data-driven field layout and confirmed against real saves. First entry in the
   reverse-engineered `docs/save-format.md`.
