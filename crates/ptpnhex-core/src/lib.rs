@@ -6,6 +6,7 @@
 //! The `ptpnhex-cli` and `ptpnhex-gui` crates are thin layers over this API.
 
 pub mod codec;
+pub mod crypto;
 pub mod error;
 pub mod keys;
 pub mod save;
