@@ -127,10 +127,10 @@ present and earlier ones already written. (modes 3/4 would post-XOR `hash198C`.)
 The `+0x20` hash uses chnnlsv mode 6, whose finalization invokes a KIRK "fuse"
 command (command 5/8) backed by hardware state that cannot be reproduced in
 software. This affects **every** PC-based PSP save tool. Consequently this one
-hash cannot be regenerated off-device. In practice the PSP does not appear to
-verify it when *loading* a save (PC tools reliably produce loadable saves); the
-editor leaves the original `+0x20` value in place and this is confirmed on real
-hardware as the M1 exit gate.
+hash cannot be regenerated off-device. The PSP does **not** verify it when
+*loading* a save: the editor leaves the original `+0x20` value in place, and a
+re-sealed save (with an edited ka-ching value) was confirmed to load correctly
+on real PSP hardware. So regenerating the other three hashes is sufficient.
 
 ## Write path
 
