@@ -129,3 +129,51 @@ fn edit_persists_and_rehashes_through_disk() {
     fs::remove_dir_all(&root).ok();
     eprintln!("SaveSlot edit round-tripped through disk with correct rehashing");
 }
+
+#[test]
+fn kaching_matches_confirmed_values() {
+    let Some(dir) = saves_dir() else {
+        eprintln!("skipped: set PTPNHEX_SAVES_DIR");
+        return;
+    };
+    let mut by_name = std::collections::HashMap::new();
+    for save in patapon_saves(&dir) {
+        let slot = SaveSlot::open(&save, &KeyProvider::Embedded).unwrap();
+        // The small system save (DATA00) has no ka-ching field; skip it.
+        if let Some(k) = slot.kaching() {
+            assert!(k <= 99_999, "{}: ka-ching {k} out of range", save.display());
+            let name = save.file_name().unwrap().to_str().unwrap().to_string();
+            by_name.insert(name, k);
+        }
+    }
+    // Confirmed in-game against the player's screen.
+    assert_eq!(by_name.get("UCES00995_DATA01"), Some(&564));
+    assert_eq!(by_name.get("UCES00995_DATA50"), Some(&598));
+    eprintln!("ka-ching read correctly for {} saves", by_name.len());
+}
+
+#[test]
+fn set_kaching_round_trips_through_disk() {
+    let Some(dir) = saves_dir() else {
+        eprintln!("skipped: set PTPNHEX_SAVES_DIR");
+        return;
+    };
+    let root = temp_root("kaching");
+    // Use a full game save (the small DATA00 has no ka-ching field).
+    let save = patapon_saves(&dir)
+        .into_iter()
+        .find(|s| s.file_name().unwrap().to_str().unwrap() == "UCES00995_DATA01")
+        .expect("DATA01 present");
+    let work = working_copy(&save, &root);
+
+    {
+        let mut slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        slot.set_kaching(7777).unwrap();
+        slot.save_without_backup().unwrap();
+    }
+    let slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+    assert_eq!(slot.kaching(), Some(7777));
+
+    fs::remove_dir_all(&root).ok();
+    eprintln!("ka-ching edit round-tripped through disk");
+}

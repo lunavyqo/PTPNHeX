@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Ka-ching (currency) editing: `SaveSlot::kaching` / `set_kaching`, backed by a
+  data-driven field layout and confirmed against real saves. First entry in the
+  reverse-engineered `docs/save-format.md`.
 - `SaveSlot` container that opens a save directory, decrypts it for editing,
   and writes it back — re-encrypting, regenerating the integrity hashes, and
   backing up the originals to `*.bak`. The Patapon EU game key is embedded, so

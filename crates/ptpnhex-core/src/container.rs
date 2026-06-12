@@ -89,6 +89,39 @@ impl SaveSlot {
         &mut self.data
     }
 
+    /// The save's ka-ching (currency), if the field is mapped for this region.
+    pub fn kaching(&self) -> Option<u32> {
+        let off = crate::save::layout::kaching_offset(self.region)?;
+        let bytes = self.data.get(off..off + 4)?;
+        Some(u32::from_le_bytes(bytes.try_into().expect("4 bytes")))
+    }
+
+    /// Sets the save's ka-ching (currency), capped at
+    /// [`crate::save::layout::KACHING_MAX`].
+    pub fn set_kaching(&mut self, value: u32) -> Result<()> {
+        use crate::save::layout::{kaching_offset, KACHING_MAX};
+        if value > KACHING_MAX {
+            return Err(Error::Unsupported(format!(
+                "ka-ching {value} exceeds the maximum of {KACHING_MAX}"
+            )));
+        }
+        let off = kaching_offset(self.region).ok_or_else(|| {
+            Error::Unsupported(format!(
+                "ka-ching is not mapped for {}",
+                self.region.serial()
+            ))
+        })?;
+        let slot = self
+            .data
+            .get_mut(off..off + 4)
+            .ok_or_else(|| Error::Malformed {
+                what: "SECURE.BIN",
+                reason: "payload too short for ka-ching field".into(),
+            })?;
+        slot.copy_from_slice(&value.to_le_bytes());
+        Ok(())
+    }
+
     /// The parsed `PARAM.SFO` metadata.
     pub fn sfo(&self) -> &ParamSfo {
         &self.sfo

@@ -1,9 +1,9 @@
 //! Typed model over the decrypted save payload.
 //!
-//! The decryption and editing model are built up over later milestones; for
-//! now this module defines the [`Region`] selector shared by the key and
-//! cryptography layers.
+//! [`Region`] selects a layout; [`layout`] maps confirmed fields to offsets.
+//! Editing accessors live on [`crate::SaveSlot`].
 
+pub mod layout;
 mod region;
 
 pub use region::Region;
