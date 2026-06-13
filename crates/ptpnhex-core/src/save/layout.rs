@@ -21,14 +21,17 @@ pub fn kaching_offset(region: Region) -> Option<usize> {
     }
 }
 
-/// Byte range of the inventory list (where material entries are scanned for).
+/// Byte range of the inventory record array.
 ///
-/// Confirmed for Europe as `0x19000..0x1A0E0` — after the unit/equipment
-/// array and before [`kaching_offset`]; verified to contain no false material
-/// matches across the save corpus.
+/// The inventory is a fixed array of 4-byte records `count:u16, flag:u8,
+/// index:u8` (see `docs/save-format.md`). Confirmed for Europe as
+/// `0x19ce8..0x1A0E0`: the start is identical across the whole save corpus and
+/// the array ends exactly where [`kaching_offset`] begins. Bounding to the real
+/// array (rather than the wider region before it) is what keeps a scan from
+/// matching stale bytes ahead of the list.
 pub fn inventory_region(region: Region) -> Option<std::ops::Range<usize>> {
     match region {
-        Region::Europe => Some(0x19000..0x1A0E0),
+        Region::Europe => Some(0x19CE8..0x1A0E0),
         Region::NorthAmerica | Region::Japan => None,
     }
 }

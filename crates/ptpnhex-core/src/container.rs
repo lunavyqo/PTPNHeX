@@ -22,6 +22,10 @@ use crate::{Error, Result};
 const SECURE_FILE: &str = "SECURE.BIN";
 const SFO_FILE: &str = "PARAM.SFO";
 
+/// `flag` byte of an inventory record whose item is owned (has a real count);
+/// `0x00` instead marks a known-but-not-owned item (see `docs/save-format.md`).
+const INVENTORY_OWNED: u8 = 0x01;
+
 /// `SAVEDATA_PARAMS` hash field offsets (within its 0x80-byte block).
 const PARAMS_HASH10: usize = 0x10;
 const PARAMS_HASH70: usize = 0x70;
@@ -165,15 +169,28 @@ impl SaveSlot {
         Ok(())
     }
 
-    /// Finds the offset of a material's count `u16` by scanning the inventory
-    /// region for its item id.
+    /// Finds the offset of a material's count `u16` within the inventory array.
+    ///
+    /// The inventory is an array of 4-byte records `count:u16, flag:u8,
+    /// index:u8` (see `docs/save-format.md`). A material is the record whose
+    /// `flag` is [`INVENTORY_OWNED`] and whose `index` equals the material's
+    /// [`index`](crate::save::Material::index); that record's leading `u16`
+    /// holds the count. Records are only accepted when the count is within the
+    /// material cap, which rejects the rare stale slot whose `flag` byte happens
+    /// to read as owned. This match is unique across the save corpus, so the
+    /// acquisition order of the array does not matter.
     fn material_offset(&self, material: crate::save::Material) -> Option<usize> {
-        let region = crate::save::layout::inventory_region(self.region)?;
-        let end = region.end.min(self.data.len());
-        let id = material.item_id().to_le_bytes();
-        let mut off = region.start;
+        use crate::save::materials::MATERIAL_MAX;
+        let array = crate::save::layout::inventory_region(self.region)?;
+        let end = array.end.min(self.data.len());
+        let index = material.index();
+        let mut off = array.start;
         while off + 4 <= end {
-            if self.data[off + 2] == id[0] && self.data[off + 3] == id[1] {
+            let count = u16::from_le_bytes([self.data[off], self.data[off + 1]]) as u32;
+            if self.data[off + 2] == INVENTORY_OWNED
+                && self.data[off + 3] == index
+                && count <= MATERIAL_MAX
+            {
                 return Some(off);
             }
             off += 4;

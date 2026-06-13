@@ -265,3 +265,52 @@ fn set_material_round_trips_through_disk() {
     fs::remove_dir_all(&root).ok();
     eprintln!("material edit round-tripped through disk");
 }
+
+#[test]
+fn owned_at_zero_material_is_editable_not_mishit() {
+    // DATA50 owns Magic Alloy at count 0 (flag-owned, count 0). The old
+    // positional reader mis-hit a neighbouring item here; the record walk must
+    // find the real Magic Alloy slot and edit it in place.
+    use ptpnhex_core::save::Material;
+    let Some(dir) = saves_dir() else {
+        eprintln!("skipped: set PTPNHEX_SAVES_DIR");
+        return;
+    };
+    let root = temp_root("ownedzero");
+    let work = working_copy(&dir.join("UCES00995_DATA50"), &root);
+    let magic = Material::from_slug("magic-alloy").unwrap();
+    {
+        let mut slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        assert_eq!(slot.material(magic), 0, "Magic Alloy starts owned-at-zero");
+        slot.set_material(magic, 77).unwrap();
+        slot.save().unwrap();
+    }
+    let slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+    assert_eq!(slot.material(magic), 77);
+    fs::remove_dir_all(&root).ok();
+    eprintln!("owned-at-zero material edited in place without mis-hitting");
+}
+
+#[test]
+fn stale_over_cap_slot_is_not_reported_or_editable() {
+    // DATA04 has a stale slot for material #14 (index 0x20) whose flag reads as
+    // owned but whose count is 256 — impossible for a 99-capped material. It
+    // must be treated as never-obtained: read 0, and refuse to edit.
+    use ptpnhex_core::save::Material;
+    let Some(dir) = saves_dir() else {
+        eprintln!("skipped: set PTPNHEX_SAVES_DIR");
+        return;
+    };
+    let eyeball = Material::from_slug("eyeball-cabbage").unwrap();
+    let mut slot = SaveSlot::open(dir.join("UCES00995_DATA04"), &KeyProvider::Embedded).unwrap();
+    assert_eq!(
+        slot.material(eyeball),
+        0,
+        "stale over-cap slot reads as absent"
+    );
+    assert!(
+        slot.set_material(eyeball, 50).is_err(),
+        "editing a never-obtained material is refused, not mis-hit"
+    );
+    eprintln!("stale over-cap inventory slot ignored");
+}
