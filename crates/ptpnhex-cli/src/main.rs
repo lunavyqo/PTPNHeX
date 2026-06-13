@@ -30,9 +30,10 @@ enum Command {
         dir: PathBuf,
         /// New ka-ching value (0–99999).
         value: u32,
-        /// Do not write `*.bak` backups of the originals.
-        #[arg(long)]
-        no_backup: bool,
+        /// Copy the original files into this directory before saving.
+        /// Must be outside the save directory.
+        #[arg(long, value_name = "DIR")]
+        backup_dir: Option<PathBuf>,
     },
     /// List the save's crafting materials and their counts.
     Materials {
@@ -48,9 +49,10 @@ enum Command {
         material: String,
         /// New count (0–99).
         value: u32,
-        /// Do not write `*.bak` backups of the originals.
-        #[arg(long)]
-        no_backup: bool,
+        /// Copy the original files into this directory before saving.
+        /// Must be outside the save directory.
+        #[arg(long, value_name = "DIR")]
+        backup_dir: Option<PathBuf>,
     },
 }
 
@@ -60,15 +62,15 @@ fn main() -> Result<()> {
         Command::SetKaching {
             dir,
             value,
-            no_backup,
-        } => set_kaching(&dir, value, no_backup),
+            backup_dir,
+        } => set_kaching(&dir, value, backup_dir.as_deref()),
         Command::Materials { dir } => materials(&dir),
         Command::SetMaterial {
             dir,
             material,
             value,
-            no_backup,
-        } => set_material(&dir, &material, value, no_backup),
+            backup_dir,
+        } => set_material(&dir, &material, value, backup_dir.as_deref()),
     }
 }
 
@@ -93,21 +95,25 @@ fn info(dir: &Path) -> Result<()> {
     Ok(())
 }
 
-fn set_kaching(dir: &Path, value: u32, no_backup: bool) -> Result<()> {
+/// Backs up the originals if a destination was given, then saves.
+fn back_up_and_save(slot: &SaveSlot, backup_dir: Option<&Path>) -> Result<()> {
+    if let Some(dest) = backup_dir {
+        slot.back_up_to(dest)
+            .with_context(|| format!("backing up originals to {}", dest.display()))?;
+        println!("Originals backed up to {}", dest.display());
+    }
+    slot.save()?;
+    Ok(())
+}
+
+fn set_kaching(dir: &Path, value: u32, backup_dir: Option<&Path>) -> Result<()> {
     let mut slot = open(dir)?;
     let before = slot.kaching();
     slot.set_kaching(value)?;
-    if no_backup {
-        slot.save_without_backup()?;
-    } else {
-        slot.save()?;
-    }
+    back_up_and_save(&slot, backup_dir)?;
     match before {
         Some(old) => println!("Ka-ching: {old} -> {value}"),
         None => println!("Ka-ching set to {value}"),
-    }
-    if !no_backup {
-        println!("Originals backed up to *.bak");
     }
     Ok(())
 }
@@ -120,7 +126,7 @@ fn materials(dir: &Path) -> Result<()> {
     Ok(())
 }
 
-fn set_material(dir: &Path, material: &str, value: u32, no_backup: bool) -> Result<()> {
+fn set_material(dir: &Path, material: &str, value: u32, backup_dir: Option<&Path>) -> Result<()> {
     if value > MATERIAL_MAX {
         bail!("count {value} exceeds the maximum of {MATERIAL_MAX}");
     }
@@ -142,15 +148,8 @@ fn set_material(dir: &Path, material: &str, value: u32, no_backup: bool) -> Resu
         m.name().to_string()
     };
 
-    if no_backup {
-        slot.save_without_backup()?;
-    } else {
-        slot.save()?;
-    }
+    back_up_and_save(&slot, backup_dir)?;
     println!("{edited}: set to {value}");
-    if !no_backup {
-        println!("Originals backed up to *.bak");
-    }
     Ok(())
 }
 

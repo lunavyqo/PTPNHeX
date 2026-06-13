@@ -15,14 +15,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (capped at 99); inserting a never-obtained one is not yet. Exposed on the CLI
   as `materials` (list) and `set-material <name|all> <count>`.
 - `ptpnhex` command-line interface with `info` (region, save title/detail, and
-  ka-ching) and `set-kaching` (write a new value, backing up the originals).
+  ka-ching) and `set-kaching` (write a new value); editing commands take an
+  optional `--backup-dir <DIR>` to copy the originals outside the save folder
+  first.
 - Ka-ching (currency) editing: `SaveSlot::kaching` / `set_kaching`, backed by a
   data-driven field layout and confirmed against real saves. First entry in the
   reverse-engineered `docs/save-format.md`.
 - `SaveSlot` container that opens a save directory, decrypts it for editing,
-  and writes it back — re-encrypting, regenerating the integrity hashes, and
-  backing up the originals to `*.bak`. The Patapon EU game key is embedded, so
-  opening a European save needs no setup.
+  and writes it back — re-encrypting and regenerating the integrity hashes.
+  `save` writes only `SECURE.BIN` and `PARAM.SFO` into the save folder (a real
+  PSP rejects a save directory that contains any other file); `back_up_to`
+  copies the originals to a directory outside the save folder on request. The
+  Patapon EU game key is embedded, so opening a European save needs no setup.
 - Mode-5 `SECURE.BIN` cryptography in `ptpnhex-core::crypto`: the keystream
   cipher (decrypt and encrypt) and the AES-CMAC integrity hashes, verified
   byte-for-byte against a real save corpus through opt-in integration tests.

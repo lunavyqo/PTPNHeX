@@ -2,7 +2,10 @@
 //!
 //! [`SaveSlot::open`] reads and decrypts a save into an editable plaintext
 //! buffer; [`SaveSlot::save`] re-encrypts it, regenerates the integrity hashes
-//! the firmware checks, and writes both files back (backing up the originals).
+//! the firmware checks, and writes both files back. It writes *only* those two
+//! files into the save directory — a real PSP rejects a save folder that
+//! contains anything else. To keep a copy of the originals first, use
+//! [`SaveSlot::back_up_to`] with a directory outside the save folder.
 
 use std::ffi::OsString;
 use std::fs;
@@ -189,28 +192,43 @@ impl SaveSlot {
     }
 
     /// Re-encrypts the payload, regenerates the integrity hashes, and writes
-    /// `SECURE.BIN` and `PARAM.SFO`, backing up the originals to `*.bak`.
+    /// `SECURE.BIN` and `PARAM.SFO` back.
+    ///
+    /// Only those two files are ever written into the save directory: a real
+    /// PSP rejects a save folder that contains any unexpected file (a stray
+    /// `*.bak` is enough to make the save unloadable). To keep a copy of the
+    /// originals, call [`SaveSlot::back_up_to`] before saving.
     pub fn save(&self) -> Result<()> {
-        self.write(true)
-    }
-
-    /// Like [`SaveSlot::save`] but without writing `*.bak` backups.
-    pub fn save_without_backup(&self) -> Result<()> {
-        self.write(false)
-    }
-
-    fn write(&self, backup: bool) -> Result<()> {
         let secure = encrypt_secure(&self.data, &self.header, &self.gamekey);
         let sfo_bytes = self.reseal_sfo(&secure)?;
 
-        let secure_path = self.dir.join(SECURE_FILE);
-        let sfo_path = self.dir.join(SFO_FILE);
-        if backup {
-            back_up(&secure_path)?;
-            back_up(&sfo_path)?;
+        write_atomic(&self.dir.join(SECURE_FILE), &secure)?;
+        write_atomic(&self.dir.join(SFO_FILE), &sfo_bytes)?;
+        Ok(())
+    }
+
+    /// Copies the current on-disk `SECURE.BIN` and `PARAM.SFO` into `dest_dir`,
+    /// creating it if needed, so the originals can be restored after a
+    /// [`SaveSlot::save`].
+    ///
+    /// `dest_dir` must be **outside** the save directory; backing up into the
+    /// save folder itself is exactly what would corrupt the save, so it is
+    /// refused.
+    pub fn back_up_to(&self, dest_dir: impl AsRef<Path>) -> Result<()> {
+        let dest_dir = dest_dir.as_ref();
+        if same_dir(dest_dir, &self.dir) {
+            return Err(Error::Unsupported(
+                "refusing to back up into the save directory itself; choose a directory outside it"
+                    .into(),
+            ));
         }
-        write_atomic(&secure_path, &secure)?;
-        write_atomic(&sfo_path, &sfo_bytes)?;
+        fs::create_dir_all(dest_dir)?;
+        for file in [SECURE_FILE, SFO_FILE] {
+            let src = self.dir.join(file);
+            if src.exists() {
+                fs::copy(&src, dest_dir.join(file))?;
+            }
+        }
         Ok(())
     }
 
@@ -296,11 +314,13 @@ fn find_file_row(list: &[u8], name: &str) -> Option<usize> {
     None
 }
 
-fn back_up(path: &Path) -> Result<()> {
-    if path.exists() {
-        fs::copy(path, with_suffix(path, ".bak"))?;
+/// Whether two paths refer to the same directory, comparing canonical forms
+/// when both exist and falling back to a literal comparison otherwise.
+fn same_dir(a: &Path, b: &Path) -> bool {
+    match (a.canonicalize(), b.canonicalize()) {
+        (Ok(a), Ok(b)) => a == b,
+        _ => a == b,
     }
-    Ok(())
 }
 
 fn write_atomic(path: &Path, data: &[u8]) -> Result<()> {
@@ -332,8 +352,14 @@ mod tests {
     #[test]
     fn with_suffix_appends() {
         assert_eq!(
-            with_suffix(Path::new("/a/SECURE.BIN"), ".bak"),
-            PathBuf::from("/a/SECURE.BIN.bak")
+            with_suffix(Path::new("/a/SECURE.BIN"), ".tmp"),
+            PathBuf::from("/a/SECURE.BIN.tmp")
         );
+    }
+
+    #[test]
+    fn same_dir_detects_equal_paths() {
+        assert!(same_dir(Path::new("/a/b"), Path::new("/a/b")));
+        assert!(!same_dir(Path::new("/a/b"), Path::new("/a/c")));
     }
 }

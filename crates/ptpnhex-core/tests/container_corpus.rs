@@ -66,7 +66,7 @@ fn save_without_edits_is_byte_identical() {
         let orig_sfo = fs::read(work.join("PARAM.SFO")).unwrap();
 
         let slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
-        slot.save_without_backup().unwrap();
+        slot.save().unwrap();
 
         assert_eq!(
             fs::read(work.join("SECURE.BIN")).unwrap(),
@@ -105,8 +105,17 @@ fn edit_persists_and_rehashes_through_disk() {
         original
     };
 
-    // The backup preserves the pre-edit ciphertext.
-    assert!(work.join("SECURE.BIN.bak").exists());
+    // save() writes ONLY the two real files into the save directory — a stray
+    // file (e.g. a *.bak) makes a real PSP reject the save.
+    let mut entries: Vec<String> = fs::read_dir(&work)
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    entries.sort();
+    assert_eq!(
+        entries,
+        vec!["PARAM.SFO".to_string(), "SECURE.BIN".to_string()]
+    );
 
     // Reopen: the edit survived the encrypt -> disk -> decrypt round trip.
     let slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
@@ -122,12 +131,42 @@ fn edit_persists_and_rehashes_through_disk() {
     );
 
     // Resealing is idempotent: saving again changes nothing.
-    slot.save_without_backup().unwrap();
+    slot.save().unwrap();
     assert_eq!(fs::read(work.join("SECURE.BIN")).unwrap(), secure);
     assert_eq!(fs::read(work.join("PARAM.SFO")).unwrap(), sfo);
 
     fs::remove_dir_all(&root).ok();
     eprintln!("SaveSlot edit round-tripped through disk with correct rehashing");
+}
+
+#[test]
+fn back_up_to_copies_originals_outside_and_refuses_the_save_dir() {
+    let Some(dir) = saves_dir() else {
+        eprintln!("skipped: set PTPNHEX_SAVES_DIR");
+        return;
+    };
+    let root = temp_root("backup");
+    let save = patapon_saves(&dir).into_iter().next().unwrap();
+    let work = working_copy(&save, &root);
+    let slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+
+    // Backing up to a directory outside the save folder copies the originals.
+    let backup = root.join("backup");
+    slot.back_up_to(&backup).unwrap();
+    assert_eq!(
+        fs::read(backup.join("SECURE.BIN")).unwrap(),
+        fs::read(work.join("SECURE.BIN")).unwrap()
+    );
+    assert_eq!(
+        fs::read(backup.join("PARAM.SFO")).unwrap(),
+        fs::read(work.join("PARAM.SFO")).unwrap()
+    );
+
+    // Backing up into the save directory itself is refused.
+    assert!(slot.back_up_to(&work).is_err());
+
+    fs::remove_dir_all(&root).ok();
+    eprintln!("back_up_to copied originals and refused the save directory");
 }
 
 #[test]
@@ -169,7 +208,7 @@ fn set_kaching_round_trips_through_disk() {
     {
         let mut slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
         slot.set_kaching(7777).unwrap();
-        slot.save_without_backup().unwrap();
+        slot.save().unwrap();
     }
     let slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
     assert_eq!(slot.kaching(), Some(7777));
@@ -213,7 +252,7 @@ fn set_material_round_trips_through_disk() {
         let mut slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
         assert_eq!(slot.material(stone), 57);
         slot.set_material(stone, 99).unwrap();
-        slot.save_without_backup().unwrap();
+        slot.save().unwrap();
     }
     let slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
     assert_eq!(slot.material(stone), 99);

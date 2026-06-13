@@ -23,7 +23,7 @@ Early development. Nothing is usable yet.
 - Decrypt and re-encrypt `SECURE.BIN` save data with correct `PARAM.SFO` hash updates
 - Edit money (ka-ching), materials, items and equipment, army composition, mission progress, and miracles
 - `ptpnhex` command-line interface and a cross-platform desktop GUI
-- Automatic backups before every write
+- Optional backups of the originals to a directory you choose
 
 ## Installation
 
@@ -43,11 +43,12 @@ Inspect a save directory:
 ptpnhex info path/to/UCES00995_DATA01
 ```
 
-Set the ka-ching (currency) value and write the save back (the originals are
-backed up to `*.bak` first):
+Set the ka-ching (currency) value and write the save back (add
+`--backup-dir <DIR>` to copy the originals somewhere safe first):
 
 ```sh
 ptpnhex set-kaching path/to/UCES00995_DATA01 99999
+ptpnhex set-kaching path/to/UCES00995_DATA01 99999 --backup-dir ~/ptpnhex-backups/DATA01
 ```
 
 List crafting materials, or set one (or all of them) — counts cap at 99:
@@ -64,8 +65,11 @@ command list.
 
 ## Save-file safety
 
-The editor never modifies a save in place without first writing a `.bak`
-backup next to it. Even so, work on copies of your saves where possible.
+The editor writes **only** `SECURE.BIN` and `PARAM.SFO` into a save folder —
+never a stray backup or temporary file, because a real PSP refuses to load a
+save directory that contains anything unexpected. To keep the originals, pass
+`--backup-dir <DIR>` (a directory outside the save folder) when editing, or
+simply work on copies of your saves.
 
 ## Legal notes
 
