@@ -63,38 +63,58 @@ falls and never exceeds the game's 99999 cap.
 
 ## The inventory list (materials and items)
 
-Obtained items are stored as a **variable-length list**, not at fixed offsets.
-Each entry is a `u32`:
+Stackable items (materials, stews, and other consumables) are stored as a
+**compacted, position-indexed list**, not at fixed offsets. Each entry is a
+`u32`:
 
 ```
-count : u16 (LE)      item id : u16 (LE)
+count : u16 (LE)      item slot : u16 (LE)
 ```
 
-The list holds only items the player has obtained, in acquisition order (not
-sorted), so a given item sits at a different offset in every save and is found
-by scanning for its item id. For Europe the list is scanned within
-`0x19000..0x1A0E0` (after the unit/equipment array, before ka-ching), a range
-verified to contain no false material matches across the corpus.
+Two properties make this list subtle, and both have been verified against the
+corpus:
+
+- **Only obtained items are stored**, packed together with no gaps. An item the
+  player has never obtained has *no entry at all* (not even a zero-count one).
+- **The "item slot" value is a running position counter, not a stable type
+  identifier.** Entries are numbered consecutively in canonical order, so when
+  an item is missing, every entry after it shifts down by one — the same slot
+  number means a *different item* in a different save.
+
+Concretely: a save that has Magic Alloy stores it at slot `0x2601`, with the
+first stew at `0x2701`. A save that never obtained Magic Alloy has no Magic
+Alloy entry, so the first stew takes slot `0x2601` instead. **The save data does
+not record what each entry *is*** — the game maps slots to item types with an
+internal table that is not in the save.
+
+For Europe the list is scanned within `0x19000..0x1A0E0` (after the
+unit/equipment array, before ka-ching).
 
 ### Materials
 
-The 20 crafting materials are the inventory entries whose item id is
-`(0x13..=0x26) << 8 | 0x01` — that is `0x1301`, `0x1401`, … `0x2601`, in this
-order:
+The 20 crafting materials occupy the first material slots, in this order:
 
-| ids           | materials                                               |
-| ------------- | ------------------------------------------------------- |
-| `0x13`–`0x16` | Leather Meat, Tender Meat, Dream Meat, Mystery Meat     |
-| `0x17`–`0x1A` | Stone, Hard Iron, Tytanium Ore, Mytheerial              |
-| `0x1B`–`0x1E` | Banal Branch, Cherry Tree, Hinoki, Super Cedar          |
-| `0x1F`–`0x22` | Eyeball Cabbage, Crying Carrot, Predator Pumpkin, Hazy Shroom |
-| `0x23`–`0x26` | Sloppy Alloy, Hard Alloy, Awesome Alloy, Magic Alloy    |
+| order | materials                                               |
+| ----- | ------------------------------------------------------- |
+| 1–4   | Leather Meat, Tender Meat, Dream Meat, Mystery Meat     |
+| 5–8   | Stone, Hard Iron, Tytanium Ore, Mytheerial              |
+| 9–12  | Banal Branch, Cherry Tree, Hinoki, Super Cedar          |
+| 13–16 | Eyeball Cabbage, Crying Carrot, Predator Pumpkin, Hazy Shroom |
+| 17–20 | Sloppy Alloy, Hard Alloy, Awesome Alloy, Magic Alloy    |
 
-Counts display two-digit, so they are capped at 99. Confirmed against all 20
-material amounts read from one save (`DATA46`). A material the player has never
-obtained is simply absent from the list (common in early saves); the editor can
-change materials that are present (every progressed save lists all 20, even at
-count 0) but cannot yet insert a brand-new one.
+In a save where all 20 are present they fall at slots `0x1301`..`0x2601` (low
+byte `0x01`), confirmed against all 20 amounts read from one save (`DATA46`).
+Counts display two-digit and are capped at 99.
+
+**Reliability caveat (important):** because slots are positional, a material can
+only be located reliably while it and every earlier material are present. The
+common materials are obtained early and stay present, so they are reliable; but
+a *missing* late material (e.g. Magic Alloy) shifts the slots, and addressing it
+by a fixed slot will hit the next item instead. Editing must therefore confirm
+an entry really is the requested material before writing — and editing an item
+the player has never obtained is not supported. (Some unexplained `b2 = 0`
+marker entries appear exactly where items go missing; understanding them is the
+likely path to handling absences robustly.)
 
 ## How fields are confirmed
 
