@@ -3,9 +3,11 @@
 //! [`Region`] selects a layout; [`layout`] maps confirmed fields to offsets.
 //! Editing accessors live on [`crate::SaveSlot`].
 
+pub mod items;
 pub mod layout;
 pub mod materials;
 mod region;
 
+pub use items::Item;
 pub use materials::Material;
 pub use region::Region;

@@ -351,3 +351,32 @@ fn obtained_and_absent_materials_both_settable() {
     assert_eq!(slot.material(dream), 50, "absent material added");
     eprintln!("early save: obtained materials edited, absent ones added");
 }
+
+#[test]
+fn item_lists_all_83_and_add_round_trips() {
+    // Items share the inventory record with materials. Listing yields the full
+    // catalog; adding a never-obtained item (Divine Sword on the early DATA04)
+    // flips its owned flag and survives the disk round trip.
+    use ptpnhex_core::save::Item;
+    let Some(dir) = saves_dir() else {
+        eprintln!("skipped: set PTPNHEX_SAVES_DIR");
+        return;
+    };
+    let root = temp_root("items");
+    let work = working_copy(&dir.join("UCES00995_DATA04"), &root);
+    let sword = Item::from_slug("divine-sword").unwrap();
+    {
+        let slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        assert_eq!(slot.items().len(), 83);
+        assert_eq!(slot.item(sword), 0, "Divine Sword not obtained this early");
+    }
+    {
+        let mut slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        slot.set_item(sword, 42).unwrap(); // adds it
+        slot.save().unwrap();
+    }
+    let slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+    assert_eq!(slot.item(sword), 42, "added item survived disk");
+    fs::remove_dir_all(&root).ok();
+    eprintln!("items listed (83) and a never-obtained item added + round-tripped");
+}

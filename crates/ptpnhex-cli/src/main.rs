@@ -5,8 +5,9 @@ use std::path::{Path, PathBuf};
 use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
 use ptpnhex_core::keys::KeyProvider;
+use ptpnhex_core::save::items::ITEM_MAX;
 use ptpnhex_core::save::materials::MATERIAL_MAX;
-use ptpnhex_core::save::Material;
+use ptpnhex_core::save::{Item, Material};
 use ptpnhex_core::SaveSlot;
 
 /// Save editor for Patapon (PSP).
@@ -47,6 +48,24 @@ enum Command {
         /// Material slug (for example `hard-alloy`), or `all` for every
         /// material present in the save.
         material: String,
+        /// New count (0–99).
+        value: u32,
+        /// Copy the original files into this directory before saving.
+        /// Must be outside the save directory.
+        #[arg(long, value_name = "DIR")]
+        backup_dir: Option<PathBuf>,
+    },
+    /// List the save's items (stews, Memories, weapons, gear) and their counts.
+    Items {
+        /// Path to the save directory.
+        dir: PathBuf,
+    },
+    /// Set an item's count (0–99), adding it if never obtained, and write back.
+    SetItem {
+        /// Path to the save directory.
+        dir: PathBuf,
+        /// Item slug (for example `divine-sword`), or `all` for every item.
+        item: String,
         /// New count (0–99).
         value: u32,
         /// Copy the original files into this directory before saving.
@@ -96,6 +115,13 @@ fn main() -> Result<()> {
             value,
             backup_dir,
         } => set_material(&dir, &material, value, backup_dir.as_deref()),
+        Command::Items { dir } => items(&dir),
+        Command::SetItem {
+            dir,
+            item,
+            value,
+            backup_dir,
+        } => set_item(&dir, &item, value, backup_dir.as_deref()),
         Command::SetTitle {
             dir,
             title,
@@ -210,6 +236,42 @@ fn set_material(dir: &Path, material: &str, value: u32, backup_dir: Option<&Path
             .with_context(|| format!("unknown material `{material}` (try `materials` to list)"))?;
         slot.set_material(m, value)?;
         m.name().to_string()
+    };
+
+    back_up_and_save(&slot, backup_dir)?;
+    println!("{edited}: set to {value}");
+    Ok(())
+}
+
+fn items(dir: &Path) -> Result<()> {
+    let slot = open(dir)?;
+    let mut category = "";
+    for (item, count) in slot.items() {
+        if item.category() != category {
+            category = item.category();
+            println!("[{category}]");
+        }
+        println!("  {:28} {count}", item.name());
+    }
+    Ok(())
+}
+
+fn set_item(dir: &Path, item: &str, value: u32, backup_dir: Option<&Path>) -> Result<()> {
+    if value > ITEM_MAX {
+        bail!("count {value} exceeds the maximum of {ITEM_MAX}");
+    }
+    let mut slot = open(dir)?;
+
+    let edited = if item == "all" {
+        for i in Item::all() {
+            slot.set_item(i, value)?;
+        }
+        format!("{} items", Item::all().count())
+    } else {
+        let i = Item::from_slug(item)
+            .with_context(|| format!("unknown item `{item}` (try `items` to list)"))?;
+        slot.set_item(i, value)?;
+        i.name().to_string()
     };
 
     back_up_and_save(&slot, backup_dir)?;

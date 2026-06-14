@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Item editing: `SaveSlot::item` / `items` / `set_item` over the 83 inventory
+  items after the materials — 4 stews, the 6 unit Memories, and the full
+  weapon/gear armory (spears, swords, scythe, shields, bows, halberds, horses,
+  hammers, horns, helms, animal helms). They share the materials' fixed-table
+  record, so counts edit in place and a never-obtained item is added. Mapped by
+  writing each slot a distinct count and reading it back in-game. Exposed on the
+  CLI as `items` (list, grouped by category) and `set-item <slug|all> <count>`.
 - Save-list label editing: `set-title` and `set-detail` set the `SAVEDATA_TITLE`
   and `SAVEDATA_DETAIL` strings the PSP shows for a save (handy for telling saves
   apart, since the folder number is not the on-screen order). These are display

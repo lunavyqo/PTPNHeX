@@ -133,15 +133,10 @@ impl SaveSlot {
         Ok(())
     }
 
-    /// The count of `material` in this save (`0` if the player has never
-    /// obtained it, in which case its inventory record is flagged not-owned).
+    /// The count of `material` (`0` if the player has never obtained it).
     pub fn material(&self, material: crate::save::Material) -> u32 {
-        match self.material_offset(material) {
-            Some(off) if self.data[off + RECORD_OWNED_FLAG] == INVENTORY_OWNED => {
-                self.data[off] as u32
-            }
-            _ => 0,
-        }
+        self.material_offset(material)
+            .map_or(0, |off| self.inventory_count(off))
     }
 
     /// Every material with its current count, in canonical order.
@@ -153,14 +148,7 @@ impl SaveSlot {
 
     /// Sets the count of `material` (capped at
     /// [`crate::save::materials::MATERIAL_MAX`]), obtaining it first if the
-    /// player never had it.
-    ///
-    /// Obtaining an item is just flipping its owned flag: the game treats that
-    /// flag as the source of truth and recomputes the cosmetic display index on
-    /// load (confirmed on hardware). So a never-obtained material is added —
-    /// flagged owned, given the count, and marked "new" so it flashes like a
-    /// real pickup — rather than refused. The display-index byte is left for the
-    /// game to recompute.
+    /// player never had it (see [`set_inventory`](Self::set_inventory)).
     pub fn set_material(&mut self, material: crate::save::Material, count: u32) -> Result<()> {
         use crate::save::materials::MATERIAL_MAX;
         if count > MATERIAL_MAX {
@@ -174,24 +162,74 @@ impl SaveSlot {
                 self.region.serial()
             ))
         })?;
+        self.set_inventory(off, count as u8);
+        Ok(())
+    }
+
+    /// The count of `item` (`0` if the player has never obtained it).
+    pub fn item(&self, item: crate::save::Item) -> u32 {
+        self.item_offset(item)
+            .map_or(0, |off| self.inventory_count(off))
+    }
+
+    /// Every item with its current count, in catalog order.
+    pub fn items(&self) -> Vec<(crate::save::Item, u32)> {
+        crate::save::Item::all()
+            .map(|i| (i, self.item(i)))
+            .collect()
+    }
+
+    /// Sets the count of `item` (capped at [`crate::save::items::ITEM_MAX`]),
+    /// obtaining it first if the player never had it (see
+    /// [`set_inventory`](Self::set_inventory)).
+    pub fn set_item(&mut self, item: crate::save::Item, count: u32) -> Result<()> {
+        use crate::save::items::ITEM_MAX;
+        if count > ITEM_MAX {
+            return Err(Error::Unsupported(format!(
+                "item count {count} exceeds the maximum of {ITEM_MAX}"
+            )));
+        }
+        let off = self.item_offset(item).ok_or_else(|| {
+            Error::Unsupported(format!("items are not mapped for {}", self.region.serial()))
+        })?;
+        self.set_inventory(off, count as u8);
+        Ok(())
+    }
+
+    /// Reads an inventory record's count, treating a not-owned record as `0`.
+    fn inventory_count(&self, off: usize) -> u32 {
+        if self.data[off + RECORD_OWNED_FLAG] == INVENTORY_OWNED {
+            self.data[off] as u32
+        } else {
+            0
+        }
+    }
+
+    /// Writes an inventory record's count, obtaining the item first if it was
+    /// never owned: the game treats the owned flag as the source of truth and
+    /// recomputes the cosmetic display index on load (confirmed on hardware), so
+    /// a never-obtained item is added — flagged owned and marked "new" so it
+    /// flashes like a real pickup — leaving the display-index byte for the game.
+    fn set_inventory(&mut self, off: usize, count: u8) {
         if self.data[off + RECORD_OWNED_FLAG] != INVENTORY_OWNED {
             self.data[off + RECORD_OWNED_FLAG] = INVENTORY_OWNED;
             self.data[off + RECORD_NEW_FLAG] = 1;
         }
-        self.data[off] = count as u8;
-        Ok(())
+        self.data[off] = count;
     }
 
-    /// The fixed offset of a material's inventory record.
-    ///
-    /// The inventory is a fixed table where every item has a stable offset (see
-    /// `docs/save-format.md`); the record is `count:u8, new:u8, owned:u8,
-    /// display-index:u8`. The material's [`position`](crate::save::Material::position)
-    /// indexes the region's offset table — the `display-index` byte is a
-    /// per-save cosmetic counter and is deliberately not used to locate it.
+    /// The fixed offset of a material's inventory record (see
+    /// [`set_inventory`](Self::set_inventory) for the record format).
     fn material_offset(&self, material: crate::save::Material) -> Option<usize> {
         let offsets = crate::save::layout::material_offsets(self.region)?;
         let off = offsets[material.position()];
+        (off + 4 <= self.data.len()).then_some(off)
+    }
+
+    /// The fixed offset of an item's inventory record.
+    fn item_offset(&self, item: crate::save::Item) -> Option<usize> {
+        let offsets = crate::save::layout::item_offsets(self.region)?;
+        let off = offsets[item.position()];
         (off + 4 <= self.data.len()).then_some(off)
     }
 
