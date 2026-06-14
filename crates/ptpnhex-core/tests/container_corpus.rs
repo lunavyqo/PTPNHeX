@@ -218,6 +218,34 @@ fn set_kaching_round_trips_through_disk() {
 }
 
 #[test]
+fn sfo_label_edit_round_trips_and_leaves_secure_untouched() {
+    // Editing a PARAM.SFO display string changes only PARAM.SFO; SECURE.BIN is
+    // byte-identical, and the save still opens (hashes regenerated correctly).
+    let Some(dir) = saves_dir() else {
+        eprintln!("skipped: set PTPNHEX_SAVES_DIR");
+        return;
+    };
+    let root = temp_root("label");
+    let save = patapon_saves(&dir).into_iter().next().unwrap();
+    let work = working_copy(&save, &root);
+    let secure_before = fs::read(work.join("SECURE.BIN")).unwrap();
+    {
+        let mut slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        slot.sfo_mut().set_str("SAVEDATA_TITLE", "TST").unwrap();
+        slot.save().unwrap();
+    }
+    let slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+    assert_eq!(slot.sfo().get_str("SAVEDATA_TITLE"), Some("TST"));
+    assert_eq!(
+        fs::read(work.join("SECURE.BIN")).unwrap(),
+        secure_before,
+        "editing the SFO label must not touch SECURE.BIN"
+    );
+    fs::remove_dir_all(&root).ok();
+    eprintln!("SFO label edit round-tripped; SECURE.BIN untouched");
+}
+
+#[test]
 fn materials_match_confirmed_values() {
     use ptpnhex_core::save::Material;
     let Some(dir) = saves_dir() else {

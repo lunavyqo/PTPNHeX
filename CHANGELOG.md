@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Save-list label editing: `set-title` and `set-detail` set the `SAVEDATA_TITLE`
+  and `SAVEDATA_DETAIL` strings the PSP shows for a save (handy for telling saves
+  apart, since the folder number is not the on-screen order). These are display
+  labels — the game regenerates the detail from its own data on its next save —
+  and editing them leaves `SECURE.BIN` untouched.
 - Materials editing: `SaveSlot::material` / `materials` / `set_material` over
   the reverse-engineered inventory table, with all 20 crafting materials located
   by their fixed record offset and an owned flag (verified against the save

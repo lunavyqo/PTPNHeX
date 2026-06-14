@@ -54,6 +54,31 @@ enum Command {
         #[arg(long, value_name = "DIR")]
         backup_dir: Option<PathBuf>,
     },
+    /// Set the save's title — the bold line shown in the PSP save list.
+    SetTitle {
+        /// Path to the save directory.
+        dir: PathBuf,
+        /// New title text.
+        title: String,
+        /// Copy the original files into this directory before saving.
+        /// Must be outside the save directory.
+        #[arg(long, value_name = "DIR")]
+        backup_dir: Option<PathBuf>,
+    },
+    /// Set the save's detail — the smaller line shown in the PSP save list.
+    ///
+    /// Note: the game regenerates this from its own data the next time it
+    /// saves, so this changes the displayed label, not the in-game values.
+    SetDetail {
+        /// Path to the save directory.
+        dir: PathBuf,
+        /// New detail text.
+        detail: String,
+        /// Copy the original files into this directory before saving.
+        /// Must be outside the save directory.
+        #[arg(long, value_name = "DIR")]
+        backup_dir: Option<PathBuf>,
+    },
 }
 
 fn main() -> Result<()> {
@@ -71,6 +96,28 @@ fn main() -> Result<()> {
             value,
             backup_dir,
         } => set_material(&dir, &material, value, backup_dir.as_deref()),
+        Command::SetTitle {
+            dir,
+            title,
+            backup_dir,
+        } => set_label(
+            &dir,
+            "SAVEDATA_TITLE",
+            "Title",
+            &title,
+            backup_dir.as_deref(),
+        ),
+        Command::SetDetail {
+            dir,
+            detail,
+            backup_dir,
+        } => set_label(
+            &dir,
+            "SAVEDATA_DETAIL",
+            "Detail",
+            &detail,
+            backup_dir.as_deref(),
+        ),
     }
 }
 
@@ -92,6 +139,23 @@ fn info(dir: &Path) -> Result<()> {
         Some(k) => println!("Ka-ching: {k}"),
         None => println!("Ka-ching: (not mapped for this region/save)"),
     }
+    Ok(())
+}
+
+/// Sets a `PARAM.SFO` display string (`SAVEDATA_TITLE` / `SAVEDATA_DETAIL`).
+fn set_label(
+    dir: &Path,
+    key: &str,
+    label: &str,
+    value: &str,
+    backup_dir: Option<&Path>,
+) -> Result<()> {
+    let mut slot = open(dir)?;
+    slot.sfo_mut()
+        .set_str(key, value)
+        .with_context(|| format!("setting {label} to {value:?}"))?;
+    back_up_and_save(&slot, backup_dir)?;
+    println!("{label} set to: {value}");
     Ok(())
 }
 
