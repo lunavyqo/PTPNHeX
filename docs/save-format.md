@@ -74,7 +74,7 @@ offset *is* the item's identity. A record is:
 
 ```
 byte 0: count          (u8)   — quantity (materials are capped at 99)
-byte 1: new            (u8)   — set on a freshly obtained item, else 0
+byte 1: new            (u8)   — the in-game "NEW!" flashing indicator (1 = new)
 byte 2: owned          (u8)   — 1 = owned, 0 = never obtained
 byte 3: display-index  (u8)   — a per-save cosmetic counter — IGNORE
 ```
@@ -111,7 +111,10 @@ flag is set, otherwise it is reported as absent (`0`). A material owned at count
 `0` (obtained then fully used) is still editable. A material that has **never
 been obtained** (`owned = 0`) is refused, not edited — adding it would mean
 flipping the `owned` flag and recomputing the display-index counters across the
-table, which is not yet supported. Writing a count touches only `byte 0`.
+table, which is not yet supported. Writing a count touches only `byte 0`, so it
+leaves the `new` flag (`byte 1`) as it was — confirmed in-game: after setting
+every material to 99, only a freshly picked-up item (whose `byte 1` was already
+`1`) kept flashing the "NEW!" indicator, while the rest did not.
 
 ### Not yet decoded
 
