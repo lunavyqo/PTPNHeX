@@ -107,20 +107,26 @@ one Mytheerial — confirmed them again: Magic Alloy's record flipped to owned a
 `0x19DA4` and Mytheerial dropped by one at its own offset, both in place.
 
 **Editing semantics.** A material is read from its `count` byte when its `owned`
-flag is set, otherwise it is reported as absent (`0`). A material owned at count
-`0` (obtained then fully used) is still editable. A material that has **never
-been obtained** (`owned = 0`) is refused, not edited — adding it would mean
-flipping the `owned` flag and recomputing the display-index counters across the
-table, which is not yet supported. Writing a count touches only `byte 0`, so it
-leaves the `new` flag (`byte 1`) as it was — confirmed in-game: after setting
-every material to 99, only a freshly picked-up item (whose `byte 1` was already
-`1`) kept flashing the "NEW!" indicator, while the rest did not.
+flag is set, otherwise it is reported as absent (`0`). Editing covers three
+cases, all confirmed in-game:
+
+- **Owned (any count, including 0):** write the `count` byte. Touching only
+  `byte 0` leaves the `new` flag as it was — after setting every material to 99,
+  only a freshly picked-up item (`byte 1 = 1`) kept flashing "NEW!".
+- **Never obtained (`owned = 0`): add it.** Set `owned = 1`, write the `count`,
+  and set `new = 1` so it flashes like a real pickup. The `display-index` byte
+  is left as-is — the game recomputes it. This was proven by writing the 20
+  materials' display indices *reversed*: in-game the menu still showed them in
+  normal order, and an in-game re-save rewrote the indices back to canonical.
+  Adding the 17 materials an early save (`DATA04`) had never obtained then
+  showed all of them in-game at the set count.
+
+Because the game owns the `display-index` byte, editing never writes it.
 
 ### Not yet decoded
 
 The non-material item identities (key items, weapons, stews) are not yet mapped
-to offsets, and the rule the game uses to assign the `display-index` byte (so a
-never-obtained item could be safely *added*) is not yet worked out.
+to offsets.
 
 ## How fields are confirmed
 
