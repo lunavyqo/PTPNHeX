@@ -105,6 +105,9 @@ the 20 counts confirmed in-game for one save (`DATA46`) exactly, and a
 controlled before/after on real hardware — obtaining one Magic Alloy, which cost
 one Mytheerial — confirmed them again: Magic Alloy's record flipped to owned at
 `0x19DA4` and Mytheerial dropped by one at its own offset, both in place.
+Finally, writing each material a distinct count (`1`–`20` in this order) and
+reading them back in-game matched **every** material by name — so each offset is
+individually confirmed, not just the set as a whole.
 
 **Editing semantics.** A material is read from its `count` byte when its `owned`
 flag is set, otherwise it is reported as absent (`0`). Editing covers three
