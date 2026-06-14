@@ -126,10 +126,39 @@ cases, all confirmed in-game:
 
 Because the game owns the `display-index` byte, editing never writes it.
 
+### Items (stews, Memories, weapons, gear)
+
+The slots after the materials hold the player's consumables and **armory**, in
+the same record format. 83 of them were mapped by writing each slot a distinct
+count and reading the result back in-game by name. In catalog order:
+
+| count | category    | first offset | items                                   |
+| ----- | ----------- | ------------ | --------------------------------------- |
+| 4     | Stews       | `0x19DA8`    | Gnarly, Tasty, King's, Divine           |
+| 6     | Memories    | `0x19DB8`    | Yari/Tate/Yumi/Kiba/Deka/Megapon's      |
+| 8     | Spears      | `0x19E28`    | Wooden … Divine Spear                    |
+| 8     | Swords/Axes | `0x19E50`    | Tin Axe … Divine Sword                   |
+| 1     | Scythe      | `0x19E70`    | Gong's Scythe                            |
+| 7     | Shields     | `0x19E78`    | Wood … Divine Shield                     |
+| 7     | Bows        | `0x19EA0`    | Wooden … Divine Bow                      |
+| 8     | Halberds    | `0x19EC8`    | Wooden … Divine Halberd                  |
+| 7     | Horses      | `0x19EF0`    | Horse … Divine Horse                     |
+| 8     | Hammers     | `0x19F18`    | Club … Divine Axe                        |
+| 7     | Horns       | `0x19F40`    | Wood … Divine Horn                       |
+| 8     | Helms       | `0x19F68`    | Wooden … Divine Helm                     |
+| 4     | Animal Helms| `0x19F88`    | Bunny Head, Scorpiton, Spiderton, Beetleton |
+
+The slots are not contiguous — unused/never-obtained slots sit between the
+categories. The exact per-item offsets are the `EU_ITEM_OFFSETS` table in
+`save/layout.rs`. Editing works exactly as for materials (read/add by owned
+flag). Two notes from the mapping: owning a unit **Memory** item does not by
+itself unlock building that unit (a separate, mission-gated flag governs that,
+not yet found), and Divine weapons display with the player name appended.
+
 ### Not yet decoded
 
-The non-material item identities (key items, weapons, stews) are not yet mapped
-to offsets.
+The other ~123 inventory slots (never owned across the save corpus) are not yet
+mapped — items the player never obtained, or unused slots.
 
 ## How fields are confirmed
 
