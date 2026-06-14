@@ -21,17 +21,26 @@ pub fn kaching_offset(region: Region) -> Option<usize> {
     }
 }
 
-/// Byte range of the inventory record array.
+/// Fixed byte offsets of the 20 materials' inventory records, in canonical
+/// order (Leather Meat … Magic Alloy), for `region`.
 ///
-/// The inventory is a fixed array of 4-byte records `count:u16, flag:u8,
-/// index:u8` (see `docs/save-format.md`). Confirmed for Europe as
-/// `0x19ce8..0x1A0E0`: the start is identical across the whole save corpus and
-/// the array ends exactly where [`kaching_offset`] begins. Bounding to the real
-/// array (rather than the wider region before it) is what keeps a scan from
-/// matching stale bytes ahead of the list.
-pub fn inventory_region(region: Region) -> Option<std::ops::Range<usize>> {
+/// The inventory is a *fixed table*: every item has a stable offset, and only
+/// the record's owned flag and count change between saves (see
+/// `docs/save-format.md`). Each record is `count:u8, new:u8, owned:u8,
+/// display-index:u8`. Confirmed for Europe against the full corpus and a
+/// controlled before/after on hardware (obtaining Magic Alloy flips the flag at
+/// `0x19DA4` in place). The 20 material records are contiguous from `0x19D54`
+/// except for one non-material slot at `0x19D74`.
+pub fn material_offsets(region: Region) -> Option<&'static [usize; 20]> {
     match region {
-        Region::Europe => Some(0x19CE8..0x1A0E0),
+        Region::Europe => Some(&EU_MATERIAL_OFFSETS),
         Region::NorthAmerica | Region::Japan => None,
     }
 }
+
+#[rustfmt::skip]
+const EU_MATERIAL_OFFSETS: [usize; 20] = [
+    0x19D54, 0x19D58, 0x19D5C, 0x19D60, 0x19D64, 0x19D68, 0x19D6C, 0x19D70,
+    0x19D78, 0x19D7C, 0x19D80, 0x19D84, 0x19D88, 0x19D8C, 0x19D90, 0x19D94,
+    0x19D98, 0x19D9C, 0x19DA0, 0x19DA4,
+];

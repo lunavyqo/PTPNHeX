@@ -10,12 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Materials editing: `SaveSlot::material` / `materials` / `set_material` over
-  the reverse-engineered inventory record array, with all 20 crafting materials
-  located by their stable inventory index (robust to the array's acquisition
-  ordering, and ignoring stale over-cap slots). Editing a material already
-  obtained is supported (capped at 99, including ones owned at count 0);
-  inserting a never-obtained one is refused for now. Exposed on the CLI as
-  `materials` (list) and `set-material <name|all> <count>`.
+  the reverse-engineered inventory table, with all 20 crafting materials located
+  by their fixed record offset and an owned flag (verified against the save
+  corpus and a controlled before/after on real hardware). Editing a material the
+  player has obtained is supported (capped at 99, including ones owned at count
+  0); a material that has never been obtained is refused rather than mis-edited.
+  Exposed on the CLI as `materials` (list) and `set-material <name|all> <count>`.
 - `ptpnhex` command-line interface with `info` (region, save title/detail, and
   ka-ching) and `set-kaching` (write a new value); editing commands take an
   optional `--backup-dir <DIR>` to copy the originals outside the save folder

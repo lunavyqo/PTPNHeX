@@ -22,8 +22,10 @@ use crate::{Error, Result};
 const SECURE_FILE: &str = "SECURE.BIN";
 const SFO_FILE: &str = "PARAM.SFO";
 
-/// `flag` byte of an inventory record whose item is owned (has a real count);
-/// `0x00` instead marks a known-but-not-owned item (see `docs/save-format.md`).
+/// Within a 4-byte inventory record `count:u8, new:u8, owned:u8, index:u8`,
+/// the offset of the owned flag (`1` = owned, `0` = never obtained) and the
+/// value that flag takes when the item is owned (see `docs/save-format.md`).
+const RECORD_OWNED_FLAG: usize = 2;
 const INVENTORY_OWNED: u8 = 0x01;
 
 /// `SAVEDATA_PARAMS` hash field offsets (within its 0x80-byte block).
@@ -130,11 +132,13 @@ impl SaveSlot {
     }
 
     /// The count of `material` in this save (`0` if the player has never
-    /// obtained it, in which case it is absent from the inventory list).
+    /// obtained it, in which case its inventory record is flagged not-owned).
     pub fn material(&self, material: crate::save::Material) -> u32 {
         match self.material_offset(material) {
-            Some(off) => u16::from_le_bytes([self.data[off], self.data[off + 1]]) as u32,
-            None => 0,
+            Some(off) if self.data[off + RECORD_OWNED_FLAG] == INVENTORY_OWNED => {
+                self.data[off] as u32
+            }
+            _ => 0,
         }
     }
 
@@ -148,10 +152,9 @@ impl SaveSlot {
     /// Sets the count of `material` (capped at
     /// [`crate::save::materials::MATERIAL_MAX`]).
     ///
-    /// Only materials already present in the save can be edited; setting one
-    /// the player has never obtained is not yet supported and returns an
-    /// error. Any reasonably progressed save lists all materials (even at
-    /// count zero).
+    /// Only materials the player has already obtained can be edited. A material
+    /// the player has never obtained (its record flagged not-owned) cannot be
+    /// added yet and returns an error rather than risking a wrong write.
     pub fn set_material(&mut self, material: crate::save::Material, count: u32) -> Result<()> {
         use crate::save::materials::MATERIAL_MAX;
         if count > MATERIAL_MAX {
@@ -159,43 +162,32 @@ impl SaveSlot {
                 "material count {count} exceeds the maximum of {MATERIAL_MAX}"
             )));
         }
-        let off = self.material_offset(material).ok_or_else(|| {
+        let off = self
+            .material_offset(material)
+            .filter(|&off| self.data[off + RECORD_OWNED_FLAG] == INVENTORY_OWNED);
+        let off = off.ok_or_else(|| {
             Error::Unsupported(format!(
-                "{} is not present in this save and cannot be added yet",
+                "{} has never been obtained in this save; adding it is not yet supported",
                 material.name()
             ))
         })?;
-        self.data[off..off + 2].copy_from_slice(&(count as u16).to_le_bytes());
+        // The count is a single byte; the owned flag and the cosmetic display
+        // index in the rest of the record are left untouched.
+        self.data[off] = count as u8;
         Ok(())
     }
 
-    /// Finds the offset of a material's count `u16` within the inventory array.
+    /// The fixed offset of a material's inventory record.
     ///
-    /// The inventory is an array of 4-byte records `count:u16, flag:u8,
-    /// index:u8` (see `docs/save-format.md`). A material is the record whose
-    /// `flag` is [`INVENTORY_OWNED`] and whose `index` equals the material's
-    /// [`index`](crate::save::Material::index); that record's leading `u16`
-    /// holds the count. Records are only accepted when the count is within the
-    /// material cap, which rejects the rare stale slot whose `flag` byte happens
-    /// to read as owned. This match is unique across the save corpus, so the
-    /// acquisition order of the array does not matter.
+    /// The inventory is a fixed table where every item has a stable offset (see
+    /// `docs/save-format.md`); the record is `count:u8, new:u8, owned:u8,
+    /// display-index:u8`. The material's [`position`](crate::save::Material::position)
+    /// indexes the region's offset table — the `display-index` byte is a
+    /// per-save cosmetic counter and is deliberately not used to locate it.
     fn material_offset(&self, material: crate::save::Material) -> Option<usize> {
-        use crate::save::materials::MATERIAL_MAX;
-        let array = crate::save::layout::inventory_region(self.region)?;
-        let end = array.end.min(self.data.len());
-        let index = material.index();
-        let mut off = array.start;
-        while off + 4 <= end {
-            let count = u16::from_le_bytes([self.data[off], self.data[off + 1]]) as u32;
-            if self.data[off + 2] == INVENTORY_OWNED
-                && self.data[off + 3] == index
-                && count <= MATERIAL_MAX
-            {
-                return Some(off);
-            }
-            off += 4;
-        }
-        None
+        let offsets = crate::save::layout::material_offsets(self.region)?;
+        let off = offsets[material.position()];
+        (off + 4 <= self.data.len()).then_some(off)
     }
 
     /// The parsed `PARAM.SFO` metadata.
