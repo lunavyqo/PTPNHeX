@@ -22,10 +22,12 @@ use crate::{Error, Result};
 const SECURE_FILE: &str = "SECURE.BIN";
 const SFO_FILE: &str = "PARAM.SFO";
 
-/// Within a 4-byte inventory record `count:u8, new:u8, owned:u8, index:u8`,
-/// the offset of the owned flag (`1` = owned, `0` = never obtained) and the
-/// value that flag takes when the item is owned (see `docs/save-format.md`).
+/// Field offsets within a 4-byte inventory record `count:u8, new:u8, owned:u8,
+/// display-index:u8` (see `docs/save-format.md`). The display index is
+/// recomputed by the game, so editing never writes it.
+const RECORD_NEW_FLAG: usize = 1;
 const RECORD_OWNED_FLAG: usize = 2;
+/// Value of the owned flag when the item is owned; `0` means never obtained.
 const INVENTORY_OWNED: u8 = 0x01;
 
 /// `SAVEDATA_PARAMS` hash field offsets (within its 0x80-byte block).
@@ -150,11 +152,15 @@ impl SaveSlot {
     }
 
     /// Sets the count of `material` (capped at
-    /// [`crate::save::materials::MATERIAL_MAX`]).
+    /// [`crate::save::materials::MATERIAL_MAX`]), obtaining it first if the
+    /// player never had it.
     ///
-    /// Only materials the player has already obtained can be edited. A material
-    /// the player has never obtained (its record flagged not-owned) cannot be
-    /// added yet and returns an error rather than risking a wrong write.
+    /// Obtaining an item is just flipping its owned flag: the game treats that
+    /// flag as the source of truth and recomputes the cosmetic display index on
+    /// load (confirmed on hardware). So a never-obtained material is added —
+    /// flagged owned, given the count, and marked "new" so it flashes like a
+    /// real pickup — rather than refused. The display-index byte is left for the
+    /// game to recompute.
     pub fn set_material(&mut self, material: crate::save::Material, count: u32) -> Result<()> {
         use crate::save::materials::MATERIAL_MAX;
         if count > MATERIAL_MAX {
@@ -162,17 +168,16 @@ impl SaveSlot {
                 "material count {count} exceeds the maximum of {MATERIAL_MAX}"
             )));
         }
-        let off = self
-            .material_offset(material)
-            .filter(|&off| self.data[off + RECORD_OWNED_FLAG] == INVENTORY_OWNED);
-        let off = off.ok_or_else(|| {
+        let off = self.material_offset(material).ok_or_else(|| {
             Error::Unsupported(format!(
-                "{} has never been obtained in this save; adding it is not yet supported",
-                material.name()
+                "materials are not mapped for {}",
+                self.region.serial()
             ))
         })?;
-        // The count is a single byte; the owned flag and the cosmetic display
-        // index in the rest of the record are left untouched.
+        if self.data[off + RECORD_OWNED_FLAG] != INVENTORY_OWNED {
+            self.data[off + RECORD_OWNED_FLAG] = INVENTORY_OWNED;
+            self.data[off + RECORD_NEW_FLAG] = 1;
+        }
         self.data[off] = count as u8;
         Ok(())
     }

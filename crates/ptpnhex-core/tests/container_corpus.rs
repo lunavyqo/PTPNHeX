@@ -267,44 +267,42 @@ fn set_material_round_trips_through_disk() {
 }
 
 #[test]
-fn never_obtained_material_reads_zero_and_refuses_edit() {
-    // DATA50 never obtained Magic Alloy — its record is flagged not-owned. This
-    // is the exact item the old positional reader mis-hit into "99 stews". It
-    // must read 0 and refuse to be set, while an owned-at-zero material in the
-    // same save (Mystery Meat) stays editable.
+fn never_obtained_material_can_be_added() {
+    // DATA50 never obtained Magic Alloy — its record is flagged not-owned. It
+    // reads 0, and setting it now *adds* it (flips the owned flag) so it reads
+    // back through disk, while an owned-at-zero material (Mystery Meat) edits in
+    // place as before.
     use ptpnhex_core::save::Material;
     let Some(dir) = saves_dir() else {
         eprintln!("skipped: set PTPNHEX_SAVES_DIR");
         return;
     };
-    let root = temp_root("absent");
+    let root = temp_root("add");
     let work = working_copy(&dir.join("UCES00995_DATA50"), &root);
     let magic = Material::from_slug("magic-alloy").unwrap();
     let mystery = Material::from_slug("mystery-meat").unwrap();
     {
         let mut slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
         assert_eq!(slot.material(magic), 0, "never-obtained reads 0");
-        assert!(
-            slot.set_material(magic, 99).is_err(),
-            "never-obtained material is refused, not mis-hit"
-        );
-        // Owned at count 0 is a different state and must remain editable.
+        slot.set_material(magic, 50).unwrap(); // adds it
+        assert_eq!(slot.material(magic), 50);
+        // Owned at count 0 is a different state; it edits in place.
         assert_eq!(slot.material(mystery), 0);
         slot.set_material(mystery, 88).unwrap();
         slot.save().unwrap();
     }
     let slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+    assert_eq!(slot.material(magic), 50, "added material survived disk");
     assert_eq!(slot.material(mystery), 88);
-    assert_eq!(slot.material(magic), 0, "still never-obtained after save");
     fs::remove_dir_all(&root).ok();
-    eprintln!("never-obtained material refused; owned-at-zero edited in place");
+    eprintln!("never-obtained material added and round-tripped; owned-at-zero edited");
 }
 
 #[test]
-fn early_save_reads_only_obtained_materials() {
+fn obtained_and_absent_materials_both_settable() {
     // DATA04 is early: it owns Leather Meat (2) and Stone (0, owned-at-zero),
-    // but most materials are not yet obtained. Obtained ones read/edit; the
-    // rest read 0 and refuse.
+    // with most materials not yet obtained. Obtained ones edit; absent ones are
+    // added.
     use ptpnhex_core::save::Material;
     let Some(dir) = saves_dir() else {
         eprintln!("skipped: set PTPNHEX_SAVES_DIR");
@@ -317,14 +315,11 @@ fn early_save_reads_only_obtained_materials() {
     assert_eq!(slot.material(leather), 2);
     assert_eq!(slot.material(stone), 0, "owned at zero");
     assert_eq!(slot.material(dream), 0, "not obtained");
-    assert!(slot.set_material(leather, 50).is_ok());
-    assert!(
-        slot.set_material(stone, 50).is_ok(),
-        "owned-at-zero editable"
-    );
-    assert!(
-        slot.set_material(dream, 50).is_err(),
-        "not-obtained material refused"
-    );
-    eprintln!("early save: obtained materials editable, absent ones refused");
+    slot.set_material(leather, 50).unwrap();
+    slot.set_material(stone, 50).unwrap();
+    slot.set_material(dream, 50).unwrap(); // added
+    assert_eq!(slot.material(leather), 50);
+    assert_eq!(slot.material(stone), 50);
+    assert_eq!(slot.material(dream), 50, "absent material added");
+    eprintln!("early save: obtained materials edited, absent ones added");
 }
