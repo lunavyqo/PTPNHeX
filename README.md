@@ -51,12 +51,31 @@ ptpnhex set-kaching path/to/UCES00995_DATA01 99999
 ptpnhex set-kaching path/to/UCES00995_DATA01 99999 --backup-dir ~/ptpnhex-backups/DATA01
 ```
 
-List crafting materials, or set one (or all of them) — counts cap at 99:
+List crafting materials, or set one (or all of them) — counts cap at 99.
+A material you have never obtained is added:
 
 ```sh
 ptpnhex materials path/to/UCES00995_DATA01
 ptpnhex set-material path/to/UCES00995_DATA01 hard-alloy 99
 ptpnhex set-material path/to/UCES00995_DATA01 all 99
+```
+
+List or set items — stews, unit Memories, and the weapon/gear armory.
+`set-item` adds an item you have never obtained, and `all` fills the catalog:
+
+```sh
+ptpnhex items path/to/UCES00995_DATA01
+ptpnhex set-item path/to/UCES00995_DATA01 divine-sword 99
+ptpnhex set-item path/to/UCES00995_DATA01 all 99
+```
+
+Relabel a save in the PSP list (handy because the folder number is not the
+on-screen order). These set the displayed title/detail; the game regenerates the
+detail from its own data the next time it saves:
+
+```sh
+ptpnhex set-title path/to/UCES00995_DATA01 "My run"
+ptpnhex set-detail path/to/UCES00995_DATA01 "before the boss"
 ```
 
 More fields are added as they are reverse-engineered (see
