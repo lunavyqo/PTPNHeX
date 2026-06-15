@@ -417,3 +417,28 @@ fn key_item_lists_all_19_and_unlock_lock_round_trips() {
     fs::remove_dir_all(&root).ok();
     eprintln!("key items listed (19) and unlock/lock round-tripped");
 }
+
+#[test]
+fn key_items_match_confirmed_ownership() {
+    // Anchors the hand-ordered EU_KEY_ITEM_OFFSETS table to a known save: DATA01's
+    // owned/not-owned set, read in-game, spans all four categories. A round-trip
+    // test alone can't catch a swapped or mis-typed offset (it reads back the same
+    // wrong slot it wrote); this assertion against real data does.
+    use ptpnhex_core::save::KeyItem;
+    let Some(dir) = saves_dir() else {
+        eprintln!("skipped: set PTPNHEX_SAVES_DIR");
+        return;
+    };
+    let slot = SaveSlot::open(dir.join("UCES00995_DATA01"), &KeyProvider::Embedded).unwrap();
+    let owned = |s: &str| slot.key_item(KeyItem::from_slug(s).unwrap());
+    // owned in DATA01:
+    assert!(owned("pon-drum"), "drum");
+    assert!(owned("rain-miracle"), "miracle");
+    assert!(owned("chakachaka-song"), "song");
+    assert!(owned("blank-map"), "quest item");
+    // not yet obtained in DATA01:
+    assert!(!owned("earthquake-miracle"), "miracle absent");
+    assert!(!owned("ponpata-song"), "song absent");
+    assert!(!owned("dark-palace-model"), "quest item absent");
+    eprintln!("key-item offsets match DATA01's confirmed ownership across all categories");
+}

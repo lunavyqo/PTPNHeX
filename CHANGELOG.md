@@ -16,7 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tested): for **songs** it is the "command learned" gate (removing a scroll
   disables that command, given the drums); for **miracles** it makes a miracle
   castable, but only after the story has opened the mission miracle slot; for
-  **drums** it is cosmetic (button availability is story-gated). The underlying
+  **quest items** it opens the matching hidden boss fight (adding all six revealed
+  six hidden missions); for **drums** it is cosmetic (button availability is
+  story-gated). The underlying
   prerequisites — drum availability and the mission miracle/stew slots — live in
   a separate story/progress structure, not the inventory. Only the 19 valid
   tokens are exposed (the unused slots after them freeze the altar). Exposed on

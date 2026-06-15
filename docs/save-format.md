@@ -184,6 +184,10 @@ showed three different behaviours:
   slot (conditionally functional).** Flagging Earthquake or Storm on a progressed
   save (which already had the mission miracle slot) made each castable; the same
   flag on an early save with no slot does nothing.
+- **Quest items — the flag is functional.** These six are location items that
+  grant access to hidden boss fights. Adding all six to an early save (which had
+  none) made six hidden boss missions appear on the world map, so setting the
+  flag opens the corresponding fight.
 - **Drums — the flag is cosmetic.** Clearing a drum's flag on a progressed save
   still leaves it usable, and forcing a drum owned on an early save does not make
   it work. Drum-button availability is governed by story progress, not this flag.
@@ -192,7 +196,7 @@ So the **prerequisites** — which drum buttons work, and whether the mission
 miracle/stew slots exist at all — live in a separate, not-yet-mapped
 story/progress structure (the unit Memories hang off the same kind of gate:
 owned ≠ buildable). The miracle-*summon* command itself has no scroll among these
-19 and is purely story-gated. The 6 quest items are not yet tested in-game.
+19 and is purely story-gated.
 
 The records that follow these 19 (up to `0x19D54`, where the materials begin) are
 never-owned/unused; forcing them owned **freezes the altar**, so the editor
