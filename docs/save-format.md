@@ -169,12 +169,26 @@ kind: **one-per unlock tokens** rather than stackable items (the count is always
 | 6     | Key items | Blank Map, Bent Compass, Dusty Crystal, Broken Sign, Black Star, Dark Palace Model |
 
 These occupy `0x19CE8`–`0x19D30`; the exact per-token offsets are the
-`EU_KEY_ITEM_OFFSETS` table in `save/layout.rs`. For these tokens only the
-**owned flag matters, and flipping it genuinely unlocks the token in-game** —
-confirmed on hardware, where flagging a never-obtained Earthquake Miracle owned
-made it performable in a mission (unlike a unit Memory, whose owned flag does
-*not* unlock the unit). The records that follow these 19 (up to `0x19D54`, where
-the materials begin) are never-owned/unused; forcing them owned **freezes the
+`EU_KEY_ITEM_OFFSETS` table in `save/layout.rs`.
+
+The owned flag here is the altar's **collection marker, not the in-game
+capability** — the same lesson as the unit Memories (owned ≠ buildable).
+Hardware testing made this clear:
+
+- Locking a drum (clearing its flag) on a progressed save still leaves it
+  **usable** in a mission, and its combo songs still play. So drum/song
+  availability ignores this flag and is driven by story progress.
+- Adding stews or miracles to an early save does **not** make the mission
+  stew/miracle placement slots appear — those slots are story-gated.
+- The flag *does* matter in one case: selecting a miracle within a mission slot
+  the story has **already** opened. Flagging a never-obtained Earthquake Miracle
+  on a progressed save (which already had the miracle slot) made it selectable;
+  the same flag on an early save with no slot does nothing.
+
+So editing these toggles what the altar shows as collected, while the actual
+abilities and mission slots live in a separate, not-yet-mapped story/progress
+structure. The records that follow these 19 (up to `0x19D54`, where the
+materials begin) are never-owned/unused; forcing them owned **freezes the
 altar**, so the editor exposes only the 19 valid tokens.
 
 ### Not yet decoded

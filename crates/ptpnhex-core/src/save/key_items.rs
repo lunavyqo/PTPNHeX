@@ -3,10 +3,15 @@
 //! These live at the very start of the inventory table, *before* the
 //! [materials](crate::save::Material), and use the same record format
 //! `count:u8, new:u8, owned:u8, display-index:u8` (see `docs/save-format.md`).
-//! Unlike materials and items they are **one-per** unlock tokens: only the owned
-//! flag is meaningful (count is always 1 in legitimate saves), and flipping it
-//! genuinely unlocks the token in-game — confirmed on hardware, where flagging a
-//! never-obtained Earthquake Miracle owned made it performable in a mission.
+//! They are **one-per** tokens (count is always 1 in legitimate saves), so
+//! editing toggles only the owned flag.
+//!
+//! That flag is the altar's **collection marker, not the in-game capability**.
+//! Hardware testing showed a locked drum still works (and its combo songs still
+//! play), and adding stews/miracles to an early save does not make the mission
+//! stew/miracle slots appear — those abilities are story-gated. The flag does
+//! affect one case: selecting a miracle within a mission slot the story has
+//! already opened (flagging Earthquake on a progressed save made it selectable).
 //!
 //! A key item is identified by its canonical [`position`](KeyItem::position),
 //! which maps to a fixed offset via

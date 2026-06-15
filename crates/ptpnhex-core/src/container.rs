@@ -209,9 +209,11 @@ impl SaveSlot {
             .collect()
     }
 
-    /// Unlocks or locks `key_item`. Unlocking flags it owned (and "new" so it
-    /// flashes), matching how the game records a freshly obtained token; locking
-    /// clears the record. Key items are one-per, so the count is fixed at 1.
+    /// Sets or clears `key_item`'s owned flag — the altar collection marker (see
+    /// [`crate::save::key_items`] for what that does and does not change
+    /// in-game). Setting it flags the record owned (and "new" so it flashes),
+    /// matching a freshly obtained token; clearing it resets the record. Key
+    /// items are one-per, so the count is fixed at 1.
     pub fn set_key_item(&mut self, key_item: crate::save::KeyItem, unlocked: bool) -> Result<()> {
         let off = self.key_item_offset(key_item).ok_or_else(|| {
             Error::Unsupported(format!(
