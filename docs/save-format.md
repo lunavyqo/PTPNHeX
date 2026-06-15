@@ -155,10 +155,43 @@ flag). Two notes from the mapping: owning a unit **Memory** item does not by
 itself unlock building that unit (a separate, mission-gated flag governs that,
 not yet found), and Divine weapons display with the player name appended.
 
+### Key items (drums, miracles, songs, quest items)
+
+The records *before* the materials, at the head of the table, are a distinct
+kind: **one-per unlock tokens** rather than stackable items (the count is always
+1). 19 of them are real, mapped by the same distinct-count readback, grouped:
+
+| count | category  | items                                                       |
+| ----- | --------- | ----------------------------------------------------------- |
+| 4     | Drums     | Pon, Pata, Chaka, Don Drum                                  |
+| 4     | Miracles  | Rain, Tailwind, Storm, Earthquake Miracle                  |
+| 5     | Songs     | Ponpata, Patapata, Ponpon, Chakachaka, Ponchaka Song       |
+| 6     | Key items | Blank Map, Bent Compass, Dusty Crystal, Broken Sign, Black Star, Dark Palace Model |
+
+These occupy `0x19CE8`–`0x19D30`; the exact per-token offsets are the
+`EU_KEY_ITEM_OFFSETS` table in `save/layout.rs`. For these tokens only the
+**owned flag matters, and flipping it genuinely unlocks the token in-game** —
+confirmed on hardware, where flagging a never-obtained Earthquake Miracle owned
+made it performable in a mission (unlike a unit Memory, whose owned flag does
+*not* unlock the unit). The records that follow these 19 (up to `0x19D54`, where
+the materials begin) are never-owned/unused; forcing them owned **freezes the
+altar**, so the editor exposes only the 19 valid tokens.
+
 ### Not yet decoded
 
-The other ~123 inventory slots (never owned across the save corpus) are not yet
-mapped — items the player never obtained, or unused slots.
+The records *after* the last item (`0x19FD4..0x1A0E0`) are mostly empty/unused,
+but a few are real (some weapons and a key item, "Meden's Trophy"); they have not
+all been named.
+
+### A note on the in-game display
+
+The item menu shows a **fixed, non-scrolling grid** of 4 columns × 33 rows (132
+cells; 4 items per row), the same on the altar inventory and the mission-prep
+gear screen. Items beyond that window still exist and function — gear stays equipped, and "optimize loadout"
+considers the full list — but they cannot be selected by hand in the menu. So an
+edit that adds a very large number of items is safe for the save, yet can push
+some items out of reach in the menu; a tidy, in-window inventory is the better
+default.
 
 ## How fields are confirmed
 

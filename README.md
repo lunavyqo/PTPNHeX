@@ -69,6 +69,16 @@ ptpnhex set-item path/to/UCES00995_DATA01 divine-sword 99
 ptpnhex set-item path/to/UCES00995_DATA01 all 99
 ```
 
+List or unlock key items — the altar's drums, miracles, songs, and quest items.
+These are one-per unlock tokens, so they are toggled on or off (unlocking a
+miracle makes it performable in-game):
+
+```sh
+ptpnhex key-items path/to/UCES00995_DATA01
+ptpnhex set-key-item path/to/UCES00995_DATA01 earthquake-miracle on
+ptpnhex set-key-item path/to/UCES00995_DATA01 all on
+```
+
 Relabel a save in the PSP list (handy because the folder number is not the
 on-screen order). These set the displayed title/detail; the game regenerates the
 detail from its own data the next time it saves:
