@@ -12,15 +12,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Key-item editing: `SaveSlot::key_item` / `key_items` / `set_key_item` over the
   19 altar tokens at the head of the inventory table — 4 drums, 4 miracles, 5
   songs, and 6 quest items. These are one-per tokens, so editing toggles their
-  owned flag on or off. The flag is the altar's **collection marker, not the
-  in-game capability**: hardware testing showed a locked drum still works (and
-  its combo songs still play), and adding stews/miracles to an early save does
-  not make the mission stew/miracle slots appear — those abilities are gated by
-  separate story progress. The flag does affect one thing: selecting a miracle
-  within a mission slot the story has already opened (flagging Earthquake on a
-  progressed save made it selectable). Only the 19 valid tokens are exposed (the
-  unused slots after them freeze the altar). Exposed on the CLI as `key-items`
-  (list, grouped by category) and `set-key-item <slug|all> <on|off>`.
+  owned flag. What the flag does in-game depends on the category (hardware
+  tested): for **songs** it is the "command learned" gate (removing a scroll
+  disables that command, given the drums); for **miracles** it makes a miracle
+  castable, but only after the story has opened the mission miracle slot; for
+  **drums** it is cosmetic (button availability is story-gated). The underlying
+  prerequisites — drum availability and the mission miracle/stew slots — live in
+  a separate story/progress structure, not the inventory. Only the 19 valid
+  tokens are exposed (the unused slots after them freeze the altar). Exposed on
+  the CLI as `key-items` (list, grouped by category) and
+  `set-key-item <slug|all> <on|off>`.
 - Item editing: `SaveSlot::item` / `items` / `set_item` over the 83 inventory
   items after the materials — 4 stews, the 6 unit Memories, and the full
   weapon/gear armory (spears, swords, scythe, shields, bows, halberds, horses,

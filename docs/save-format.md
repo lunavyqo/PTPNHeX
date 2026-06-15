@@ -171,25 +171,32 @@ kind: **one-per unlock tokens** rather than stackable items (the count is always
 These occupy `0x19CE8`–`0x19D30`; the exact per-token offsets are the
 `EU_KEY_ITEM_OFFSETS` table in `save/layout.rs`.
 
-The owned flag here is the altar's **collection marker, not the in-game
-capability** — the same lesson as the unit Memories (owned ≠ buildable).
-Hardware testing made this clear:
+What the owned flag *does* in-game depends on the category — hardware testing
+showed three different behaviours:
 
-- Locking a drum (clearing its flag) on a progressed save still leaves it
-  **usable** in a mission, and its combo songs still play. So drum/song
-  availability ignores this flag and is driven by story progress.
-- Adding stews or miracles to an early save does **not** make the mission
-  stew/miracle placement slots appear — those slots are story-gated.
-- The flag *does* matter in one case: selecting a miracle within a mission slot
-  the story has **already** opened. Flagging a never-obtained Earthquake Miracle
-  on a progressed save (which already had the miracle slot) made it selectable;
-  the same flag on an early save with no slot does nothing.
+- **Songs — the flag is the "command learned" gate (functional).** Removing the
+  Attack (Pon-Pon-Pata-Pon) and Defend (Chaka-Chaka-Pata-Pon) scrolls from a
+  progressed save disabled those commands in a mission (only March still worked);
+  adding the two missing song scrolls to a save that already had the drums made
+  those commands usable. A combo also needs its constituent drums to be
+  available, but given the drums, the song flag teaches or un-teaches the command.
+- **Miracles — the flag selects the miracle, but only after the story opens the
+  slot (conditionally functional).** Flagging Earthquake or Storm on a progressed
+  save (which already had the mission miracle slot) made each castable; the same
+  flag on an early save with no slot does nothing.
+- **Drums — the flag is cosmetic.** Clearing a drum's flag on a progressed save
+  still leaves it usable, and forcing a drum owned on an early save does not make
+  it work. Drum-button availability is governed by story progress, not this flag.
 
-So editing these toggles what the altar shows as collected, while the actual
-abilities and mission slots live in a separate, not-yet-mapped story/progress
-structure. The records that follow these 19 (up to `0x19D54`, where the
-materials begin) are never-owned/unused; forcing them owned **freezes the
-altar**, so the editor exposes only the 19 valid tokens.
+So the **prerequisites** — which drum buttons work, and whether the mission
+miracle/stew slots exist at all — live in a separate, not-yet-mapped
+story/progress structure (the unit Memories hang off the same kind of gate:
+owned ≠ buildable). The miracle-*summon* command itself has no scroll among these
+19 and is purely story-gated. The 6 quest items are not yet tested in-game.
+
+The records that follow these 19 (up to `0x19D54`, where the materials begin) are
+never-owned/unused; forcing them owned **freezes the altar**, so the editor
+exposes only the 19 valid tokens.
 
 ### Not yet decoded
 

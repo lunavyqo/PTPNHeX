@@ -6,12 +6,13 @@
 //! They are **one-per** tokens (count is always 1 in legitimate saves), so
 //! editing toggles only the owned flag.
 //!
-//! That flag is the altar's **collection marker, not the in-game capability**.
-//! Hardware testing showed a locked drum still works (and its combo songs still
-//! play), and adding stews/miracles to an early save does not make the mission
-//! stew/miracle slots appear — those abilities are story-gated. The flag does
-//! affect one case: selecting a miracle within a mission slot the story has
-//! already opened (flagging Earthquake on a progressed save made it selectable).
+//! What that flag does in-game depends on the category (hardware tested): for
+//! **songs** it is the "command learned" gate — removing a scroll disables that
+//! command in a mission, given its drums; for **miracles** it makes a miracle
+//! castable, but only after the story has opened the mission miracle slot; for
+//! **drums** it is cosmetic (button availability is story-gated). The underlying
+//! prerequisites — drum availability and the mission miracle/stew slots — live
+//! in a separate story/progress structure, not the inventory.
 //!
 //! A key item is identified by its canonical [`position`](KeyItem::position),
 //! which maps to a fixed offset via

@@ -49,12 +49,12 @@ const EU_MATERIAL_OFFSETS: [usize; 20] = [
 /// items), in catalog order, for `region`.
 ///
 /// Same fixed-table record as [`material_offsets`]; these are the head records
-/// *before* the materials. They are one-per tokens whose owned flag is the
-/// altar's collection marker, not the in-game capability (drums/songs work
-/// regardless of it, and the mission stew/miracle slots are story-gated — see
-/// `key_items` and `docs/save-format.md`). Mapped for Europe by a distinct-count
-/// readback. Only these 19 are exposed: the records after them in the head block
-/// are never-owned/unused and forcing them owned freezes the altar.
+/// *before* the materials. They are one-per tokens whose owned flag has a
+/// category-dependent in-game effect (functional for songs and — once the story
+/// opens the slot — miracles, but cosmetic for drums; see `key_items` and
+/// `docs/save-format.md`). Mapped for Europe by a distinct-count readback. Only
+/// these 19 are exposed: the records after them in the head block are
+/// never-owned/unused and forcing them owned freezes the altar.
 pub fn key_item_offsets(region: Region) -> Option<&'static [usize; 19]> {
     match region {
         Region::Europe => Some(&EU_KEY_ITEM_OFFSETS),
