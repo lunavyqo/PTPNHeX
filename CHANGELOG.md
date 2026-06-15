@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- Expanded the *Progress and mission unlocks* section of `docs/save-format.md`
+  with the byte-level decode of the `0x1AD70`–`0x1ADB0` unlock bitfields
+  (separating the unlock-accumulator bytes from volatile current-state),
+  documented that this region is the master unlock table behind drums, unit
+  building, missions, and boss missions (confirmed by a forward "unlock
+  everything" hardware test), and mapped the mission-prep loadout slots (miracle
+  and stew) to bit 0 of `0x1A0F0`.
 - Expanded `docs/save-format.md` into a full save-format reference: complete
   per-item and per-key-item offset tables (every offset, not just category
   summaries), and a new *Progress and mission unlocks* section documenting the

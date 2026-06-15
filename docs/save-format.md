@@ -310,7 +310,9 @@ default.
 
 Most of what looks "owned but unusable" — drum buttons, the mission miracle/stew
 slots, which unit types can be built — is governed not by the inventory but by a
-separate **progression system**. Three pieces of it are mapped:
+separate **progression system**. Several pieces of it are mapped: the unit roster
+array, the mission counter, the master unlock bitfields, and the mission-prep
+loadout-slot flag.
 
 ### The unit roster array (`~0x40`–`0x19000`)
 
@@ -335,16 +337,48 @@ approach all-`0xFF` near 100% completion — **each bit corresponds to one unloc
 (a learned command, an opened mission, etc.). For example the Chaka drum's unlock
 is bits in `0x1AD78`/`0x1AD87`.
 
-This is the gate behind the inventory tokens: a drum's owned flag is cosmetic, but
-the *command* is enabled by these bits; a miracle is selectable only once the bits
-that open the mission slot are set. The mechanism was confirmed both directions on
-hardware — clearing a save's Chaka unlock bits **disabled** the drum in a mission
-(the token still showed), and writing the captured "learned" bits onto a save that
-never had Chaka **enabled** it. Nearby, a separate `u32` array at `0x1A630+` holds
-per-category play counts (not unlock flags).
+This is the **master unlock table**, and copying it forward unlocks almost
+everything at once. A controlled hardware test — OR-ing a near-complete save's
+unlock bytes onto an early save — simultaneously made **all four drums** usable,
+**every unit type buildable**, the **entire mission list** available, and **all
+boss missions** open (the boss missions came on with *no* location items in the
+inventory, so the quest items merely set these same bits), with nothing visibly
+desynced. So drum availability, unit-building, mission/boss availability, and most
+minigames are all gated here, not by separate per-feature flags.
 
-Not yet decoded: the meaning of each individual bit, and the specific bits that
-gate unit-building, are still being mapped.
+Classifying every byte by whether its bits are strictly accumulating across the
+chronological corpus separates the genuine unlock bits from volatile state that
+happens to sit in the same span:
+
+| Bytes | Kind |
+| --- | --- |
+| `0x1AD72`–`74`, `0x1AD77`–`7D`, `0x1AD86`–`87`, `0x1AD8B`–`8E`, `0x1AD94`–`9D`, `0x1AD9F`–`A1` | **Unlock accumulators** — bits only ever set, never cleared; the real unlock table |
+| `0x1AD71`, `0x1AD84`–`85`, `0x1AD88`–`8A`, `0x1AD9E`, `0x1ADAF` | Volatile current-state — bits clear from save to save |
+| remainder | Constant `0x00` padding |
+
+Only the accumulator bytes should be copied to "unlock everything"; the volatile
+bytes are left as the target save's own to avoid desyncing its current state. The
+mechanism was confirmed both directions on hardware — clearing a save's Chaka
+unlock bits (`0x1AD78`/`0x1AD87`, both accumulator bytes) **disabled** the drum in
+a mission (the token still showed), and writing the captured "learned" bits onto a
+save that never had Chaka **enabled** it. Nearby, a separate `u32` array at
+`0x1A630+` holds per-category play counts (not unlock flags).
+
+### The mission-prep loadout slots (`0x1A0F0`)
+
+The slots that hold a **miracle and a stew** during mission preparation are *not*
+in the unlock bitfields above — copying the full `0x1AD70`–`0x1ADB0` region leaves
+them closed. They are gated by a single flag: **bit 0 of `0x1A0F0`**. Setting it
+opens *both* slots together (a save with the bit clear shows neither slot; setting
+only this bit restores both); with the slots open, which miracles are castable
+then follows from the miracle tokens in the inventory. The flag first sets early in
+the story (around the fifth mission) and persists thereafter.
+
+Not yet decoded: the meaning of each *individual* unlock bit (which bit opens which
+specific mission/command). One feature is known **not** to live here — the mountain
+minigame stays locked even with the whole unlock region and every nearby persistent
+flag set, so it appears to be gated by volatile current chapter/map state rather
+than a permanent unlock bit.
 
 ## How fields are confirmed
 
