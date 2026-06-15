@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for your interest in PTPNHEX. This document describes the conventions
+Thanks for your interest in PTPNHeX. This document describes the conventions
 every change to this repository follows.
 
 ## Workflow

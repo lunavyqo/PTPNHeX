@@ -1,6 +1,6 @@
 [package]
 name = "ptpnhex-core"
-description = "Save-data parsing, cryptography, and editing model for the PTPNHEX save editor"
+description = "Save-data parsing, cryptography, and editing model for the PTPNHeX save editor"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

@@ -9,7 +9,7 @@ default-members = ["crates/ptpnhex-core", "crates/ptpnhex-cli"]
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
-repository = "https://github.com/lunavyqo/PTPNHEX"
+repository = "https://github.com/lunavyqo/PTPNHeX"
 rust-version = "1.85"
 
 [workspace.dependencies]

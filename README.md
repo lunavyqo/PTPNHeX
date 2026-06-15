@@ -1,9 +1,9 @@
-# PTPNHEX
+# PTPNHeX
 
 A save editor for Patapon™ (PSP), in the spirit of tools like PKHeX: open a save,
 inspect and edit its contents, and write it back in a form the game accepts.
 
-> **Unofficial project.** PTPNHEX is not affiliated with, endorsed by, or
+> **Unofficial project.** PTPNHeX is not affiliated with, endorsed by, or
 > sponsored by Sony Interactive Entertainment. Patapon is a trademark of its
 > respective owner. This tool only operates on save data you created with your
 > own copy of the game.

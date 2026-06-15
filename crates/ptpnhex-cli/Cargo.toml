@@ -1,6 +1,6 @@
 [package]
 name = "ptpnhex-cli"
-description = "Command-line interface for the PTPNHEX save editor"
+description = "Command-line interface for the PTPNHeX save editor"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

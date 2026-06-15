@@ -1,4 +1,4 @@
-//! Core library for PTPNHEX, a save editor for Patapon (PSP).
+//! Core library for PTPNHeX, a save editor for Patapon (PSP).
 //!
 //! This crate contains everything that is independent of a user interface:
 //! `PARAM.SFO` parsing and serialization, save-data encryption and

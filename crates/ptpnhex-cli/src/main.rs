@@ -1,4 +1,4 @@
-//! `ptpnhex` — command-line interface for the PTPNHEX save editor.
+//! `ptpnhex` — command-line interface for the PTPNHeX save editor.
 
 use std::path::{Path, PathBuf};
 
