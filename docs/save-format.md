@@ -129,47 +129,135 @@ Because the game owns the `display-index` byte, editing never writes it.
 ### Items (stews, Memories, weapons, gear)
 
 The slots after the materials hold the player's consumables and **armory**, in
-the same record format. 83 of them were mapped by writing each slot a distinct
-count and reading the result back in-game by name. In catalog order:
+the same record format. All 83 were mapped by writing each slot a distinct count
+and reading the result back in-game by name. The slots are not contiguous —
+unused/never-obtained slots sit between the categories. Full per-item offsets
+(Europe), in catalog order:
 
-| count | category    | first offset | items                                   |
-| ----- | ----------- | ------------ | --------------------------------------- |
-| 4     | Stews       | `0x19DA8`    | Gnarly, Tasty, King's, Divine           |
-| 6     | Memories    | `0x19DB8`    | Yari/Tate/Yumi/Kiba/Deka/Megapon's      |
-| 8     | Spears      | `0x19E28`    | Wooden … Divine Spear                    |
-| 8     | Swords/Axes | `0x19E50`    | Tin Axe … Divine Sword                   |
-| 1     | Scythe      | `0x19E70`    | Gong's Scythe                            |
-| 7     | Shields     | `0x19E78`    | Wood … Divine Shield                     |
-| 7     | Bows        | `0x19EA0`    | Wooden … Divine Bow                      |
-| 8     | Halberds    | `0x19EC8`    | Wooden … Divine Halberd                  |
-| 7     | Horses      | `0x19EF0`    | Horse … Divine Horse                     |
-| 8     | Hammers     | `0x19F18`    | Club … Divine Axe                        |
-| 7     | Horns       | `0x19F40`    | Wood … Divine Horn                       |
-| 8     | Helms       | `0x19F68`    | Wooden … Divine Helm                     |
-| 4     | Animal Helms| `0x19F88`    | Bunny Head, Scorpiton, Spiderton, Beetleton |
+| offset    | item                          | category    |
+| --------- | ----------------------------- | ----------- |
+| `0x19DA8` | Gnarly Stew                   | Stew        |
+| `0x19DAC` | Tasty Stew                    | Stew        |
+| `0x19DB0` | King's Stew                   | Stew        |
+| `0x19DB4` | Divine Stew                   | Stew        |
+| `0x19DB8` | Yaripon's Memory              | Memory      |
+| `0x19DBC` | Tatepon's Memory              | Memory      |
+| `0x19DC0` | Yumipon's Memory              | Memory      |
+| `0x19DC4` | Kibapon's Memory              | Memory      |
+| `0x19DC8` | Dekapon's Memory              | Memory      |
+| `0x19DCC` | Megapon's Memory              | Memory      |
+| `0x19E28` | Wooden Spear                  | Spear       |
+| `0x19E2C` | Iron Spear                    | Spear       |
+| `0x19E30` | Steel Spear                   | Spear       |
+| `0x19E34` | Scorching Spear               | Spear       |
+| `0x19E38` | Dokaknel's Fang               | Spear       |
+| `0x19E3C` | Ancient Spear                 | Spear       |
+| `0x19E40` | Giant Spear "Bullet"          | Spear       |
+| `0x19E44` | Divine Spear                  | Spear       |
+| `0x19E50` | Tin Axe                       | Sword       |
+| `0x19E54` | Iron Sword                    | Sword       |
+| `0x19E58` | Steel Axe                     | Sword       |
+| `0x19E5C` | Sleep Sword                   | Sword       |
+| `0x19E60` | Flame Sword                   | Sword       |
+| `0x19E64` | Ancient Axe                   | Sword       |
+| `0x19E68` | Ancient Sword "The Butcher"   | Sword       |
+| `0x19E6C` | Divine Sword                  | Sword       |
+| `0x19E70` | Gong's Scythe                 | Scythe      |
+| `0x19E78` | Wood Shield                   | Shield      |
+| `0x19E80` | Steel Shield                  | Shield      |
+| `0x19E84` | Ice Shield                    | Shield      |
+| `0x19E88` | Ultra Heavy Shield            | Shield      |
+| `0x19E8C` | Ancient Shield                | Shield      |
+| `0x19E90` | Giant Shield "Octagon"        | Shield      |
+| `0x19E94` | Divine Shield                 | Shield      |
+| `0x19EA0` | Wooden Bow                    | Bow         |
+| `0x19EA8` | Steel Bow                     | Bow         |
+| `0x19EAC` | Flame Bow                     | Bow         |
+| `0x19EB0` | Piercing Bow                  | Bow         |
+| `0x19EB4` | Ancient Bow                   | Bow         |
+| `0x19EB8` | Giant Bow "Failnaught"        | Bow         |
+| `0x19EBC` | Divine Bow                    | Bow         |
+| `0x19EC8` | Wooden Halberd                | Halberd     |
+| `0x19ECC` | Iron Halberd                  | Halberd     |
+| `0x19ED0` | Steel Halberd                 | Halberd     |
+| `0x19ED4` | Deflecting Halberd            | Halberd     |
+| `0x19ED8` | Flame Halberd                 | Halberd     |
+| `0x19EDC` | Ancient Halberd               | Halberd     |
+| `0x19EE0` | Giant Halberd "Grizzly"       | Halberd     |
+| `0x19EE4` | Divine Halberd                | Halberd     |
+| `0x19EF0` | Horse                         | Horse       |
+| `0x19EF8` | Tough Horse                   | Horse       |
+| `0x19EFC` | Strong Horse                  | Horse       |
+| `0x19F00` | Crimson Horse                 | Horse       |
+| `0x19F04` | Ancient Horse                 | Horse       |
+| `0x19F08` | Deep Impact                   | Horse       |
+| `0x19F0C` | Divine Horse                  | Horse       |
+| `0x19F18` | Club                          | Hammer      |
+| `0x19F1C` | Iron Hammer                   | Hammer      |
+| `0x19F20` | Steel Mace                    | Hammer      |
+| `0x19F24` | Nail Studded Bat              | Hammer      |
+| `0x19F28` | Dream Weaver                  | Hammer      |
+| `0x19F2C` | Ancient Hammer                | Hammer      |
+| `0x19F30` | Morning Star "Giganto"        | Hammer      |
+| `0x19F34` | Divine Axe                    | Hammer      |
+| `0x19F40` | Wood Horn                     | Horn        |
+| `0x19F44` | Iron Horn                     | Horn        |
+| `0x19F48` | Steel Horn                    | Horn        |
+| `0x19F4C` | Gaeen's Horn                  | Horn        |
+| `0x19F50` | Ciokin's Horn                 | Horn        |
+| `0x19F54` | Shookle's Horn                | Horn        |
+| `0x19F5C` | Divine Horn                   | Horn        |
+| `0x19F68` | Wooden Helm                   | Helm        |
+| `0x19F6C` | Iron Helm                     | Helm        |
+| `0x19F70` | Steel Helm                    | Helm        |
+| `0x19F74` | Wind Helm                     | Helm        |
+| `0x19F78` | Strength Helm                 | Helm        |
+| `0x19F7C` | Ancient Helm                  | Helm        |
+| `0x19F80` | Giant Helm "Turtle"           | Helm        |
+| `0x19F84` | Divine Helm                   | Helm        |
+| `0x19F88` | Bunny Head                    | Animal Helm |
+| `0x19FC8` | Scorpiton Helm                | Animal Helm |
+| `0x19FCC` | Spiderton Helm                | Animal Helm |
+| `0x19FD0` | Beetleton Helm                | Animal Helm |
 
-The slots are not contiguous — unused/never-obtained slots sit between the
-categories. The exact per-item offsets are the `EU_ITEM_OFFSETS` table in
-`save/layout.rs`. Editing works exactly as for materials (read/add by owned
-flag). Two notes from the mapping: owning a unit **Memory** item does not by
-itself unlock building that unit (a separate, mission-gated flag governs that,
-not yet found), and Divine weapons display with the player name appended.
+(This table mirrors the `EU_ITEM_OFFSETS` array in `save/layout.rs`, the
+authoritative source the editor uses.) Editing works exactly as for materials
+(read/add by owned flag). Two notes from the mapping: owning a unit **Memory**
+item does not by itself unlock building that unit (a separate, mission-gated flag
+governs that — see *Progress and mission unlocks* below), and Divine weapons
+display with the player name appended.
 
 ### Key items (drums, miracles, songs, quest items)
 
 The records *before* the materials, at the head of the table, are a distinct
 kind: **one-per unlock tokens** rather than stackable items (the count is always
-1). 19 of them are real, mapped by the same distinct-count readback, grouped:
+1). 19 of them are real, mapped by the same distinct-count readback. They occupy
+`0x19CE8`–`0x19D30`:
 
-| count | category  | items                                                       |
-| ----- | --------- | ----------------------------------------------------------- |
-| 4     | Drums     | Pon, Pata, Chaka, Don Drum                                  |
-| 4     | Miracles  | Rain, Tailwind, Storm, Earthquake Miracle                  |
-| 5     | Songs     | Ponpata, Patapata, Ponpon, Chakachaka, Ponchaka Song       |
-| 6     | Key items | Blank Map, Bent Compass, Dusty Crystal, Broken Sign, Black Star, Dark Palace Model |
+| offset    | item              | category |
+| --------- | ----------------- | -------- |
+| `0x19CE8` | Pon Drum          | Drum     |
+| `0x19CEC` | Pata Drum         | Drum     |
+| `0x19CF0` | Chaka Drum        | Drum     |
+| `0x19CF4` | Don Drum          | Drum     |
+| `0x19CF8` | Rain Miracle      | Miracle  |
+| `0x19CFC` | Tailwind Miracle  | Miracle  |
+| `0x19D00` | Storm Miracle     | Miracle  |
+| `0x19D04` | Earthquake Miracle| Miracle  |
+| `0x19D10` | Ponpata Song      | Song     |
+| `0x19D24` | Patapata Song     | Song     |
+| `0x19D28` | Ponpon Song       | Song     |
+| `0x19D2C` | Chakachaka Song   | Song     |
+| `0x19D30` | Ponchaka Song     | Song     |
+| `0x19D08` | Blank Map         | Key Item |
+| `0x19D0C` | Bent Compass      | Key Item |
+| `0x19D14` | Dusty Crystal     | Key Item |
+| `0x19D18` | Broken Sign       | Key Item |
+| `0x19D1C` | Black Star        | Key Item |
+| `0x19D20` | Dark Palace Model | Key Item |
 
-These occupy `0x19CE8`–`0x19D30`; the exact per-token offsets are the
-`EU_KEY_ITEM_OFFSETS` table in `save/layout.rs`.
+(Mirrors `EU_KEY_ITEM_OFFSETS` in `save/layout.rs`. Offsets are not in ascending
+order because the table is grouped by category for readable listings.)
 
 What the owned flag *does* in-game depends on the category — hardware testing
 showed three different behaviours:
@@ -193,10 +281,10 @@ showed three different behaviours:
   it work. Drum-button availability is governed by story progress, not this flag.
 
 So the **prerequisites** — which drum buttons work, and whether the mission
-miracle/stew slots exist at all — live in a separate, not-yet-mapped
-story/progress structure (the unit Memories hang off the same kind of gate:
-owned ≠ buildable). The miracle-*summon* command itself has no scroll among these
-19 and is purely story-gated.
+miracle/stew slots exist at all — live in a separate **story/progress structure**
+(documented under *Progress and mission unlocks* below; the unit Memories hang off
+the same kind of gate: owned ≠ buildable). The miracle-*summon* command itself has
+no scroll among these 19 and is purely story-gated.
 
 The records that follow these 19 (up to `0x19D54`, where the materials begin) are
 never-owned/unused; forcing them owned **freezes the altar**, so the editor
@@ -217,6 +305,46 @@ considers the full list — but they cannot be selected by hand in the menu. So 
 edit that adds a very large number of items is safe for the save, yet can push
 some items out of reach in the menu; a tidy, in-window inventory is the better
 default.
+
+## Progress and mission unlocks
+
+Most of what looks "owned but unusable" — drum buttons, the mission miracle/stew
+slots, which unit types can be built — is governed not by the inventory but by a
+separate **progression system**. Three pieces of it are mapped:
+
+### The unit roster array (`~0x40`–`0x19000`)
+
+From near the start of the payload, the save holds the player's unit/equipment
+roster as **fixed `0x104`-byte records**, each carrying `unit###_##_##` /
+`wpn###` / `rwpn###` / `hlm###` / `sld###` ASCII identifiers (see *Overall
+structure*). Records fill in as units are recruited, and their stat/level bytes
+only grow over a playthrough. A **second copy** of this array lives at
+`0x30000+`. (This is the roster, not the *buildable* gate — see below.)
+
+### The mission counter (`0x0`)
+
+The byte at `0x0` is a monotonic counter of missions/battles completed (it climbs
+across a playthrough and never decreases).
+
+### The unlock bitfields (`0x1AD70`–`0x1ADB0`)
+
+After ka-ching, the region `0x1A0F0+` mixes volatile current-state (the available-
+mission list, current map) with **persistent unlock bitfields** at roughly
+`0x1AD70`–`0x1ADB0`. These accumulate set bits as the player progresses and
+approach all-`0xFF` near 100% completion — **each bit corresponds to one unlock**
+(a learned command, an opened mission, etc.). For example the Chaka drum's unlock
+is bits in `0x1AD78`/`0x1AD87`.
+
+This is the gate behind the inventory tokens: a drum's owned flag is cosmetic, but
+the *command* is enabled by these bits; a miracle is selectable only once the bits
+that open the mission slot are set. The mechanism was confirmed both directions on
+hardware — clearing a save's Chaka unlock bits **disabled** the drum in a mission
+(the token still showed), and writing the captured "learned" bits onto a save that
+never had Chaka **enabled** it. Nearby, a separate `u32` array at `0x1A630+` holds
+per-category play counts (not unlock flags).
+
+Not yet decoded: the meaning of each individual bit, and the specific bits that
+gate unit-building, are still being mapped.
 
 ## How fields are confirmed
 

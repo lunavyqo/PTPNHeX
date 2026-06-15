@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- Expanded `docs/save-format.md` into a full save-format reference: complete
+  per-item and per-key-item offset tables (every offset, not just category
+  summaries), and a new *Progress and mission unlocks* section documenting the
+  unit roster array, the mission counter at `0x0`, and the unlock bitfields at
+  `0x1AD70`–`0x1ADB0` (the mission-gate mechanism behind drums, the miracle/stew
+  slots, and unit-building).
+
 ### Added
 
 - Key-item editing: `SaveSlot::key_item` / `key_items` / `set_key_item` over the
