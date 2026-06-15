@@ -100,3 +100,50 @@ const EU_ITEM_OFFSETS: [usize; 83] = [
     0x19F6C, 0x19F70, 0x19F74, 0x19F78, 0x19F7C, 0x19F80, 0x19F84, 0x19F88,
     0x19FC8, 0x19FCC, 0x19FD0,
 ];
+
+/// Bit (within the byte at [`loadout_slots_offset`]) that opens the mission-prep
+/// miracle and stew slots together.
+pub const LOADOUT_SLOTS_BIT: u8 = 0x01;
+
+/// Offset of the mission-prep loadout-slots flag for `region`.
+///
+/// The byte at this offset holds, in [`LOADOUT_SLOTS_BIT`], the flag that opens
+/// *both* the miracle and the stew slot shown during mission preparation. It is
+/// **not** part of the unlock bitfields ([`unlock_all_masks`]): copying that whole
+/// region leaves the slots closed, and setting only this bit opens both. Confirmed
+/// for Europe at `0x1A0F0` by hardware bisection (see `docs/save-format.md`).
+pub fn loadout_slots_offset(region: Region) -> Option<usize> {
+    match region {
+        Region::Europe => Some(0x1A0F0),
+        Region::NorthAmerica | Region::Japan => None,
+    }
+}
+
+/// `(offset, OR-mask)` pairs that, applied to the save's unlock bitfields, set
+/// every confirmed unlock for `region` — all drums, every buildable unit type,
+/// the full mission list, and all boss missions.
+///
+/// These cover only the **unlock-accumulator** bytes of the `0x1AD70`–`0x1ADB0`
+/// region (the bits that strictly accumulate across a playthrough); the volatile
+/// current-state bytes interleaved in that span are deliberately excluded so a
+/// forced unlock does not disturb the save's current state. OR-ing the masks can
+/// only set bits, never clear them. Each mask is the union of that byte across the
+/// save corpus (its fully-unlocked value). Confirmed for Europe by a forward
+/// unlock-everything test on hardware (see `docs/save-format.md`).
+pub fn unlock_all_masks(region: Region) -> Option<&'static [(usize, u8)]> {
+    match region {
+        Region::Europe => Some(&EU_UNLOCK_ALL_MASKS),
+        Region::NorthAmerica | Region::Japan => None,
+    }
+}
+
+#[rustfmt::skip]
+const EU_UNLOCK_ALL_MASKS: [(usize, u8); 28] = [
+    (0x1AD72, 0x3F), (0x1AD73, 0xF0), (0x1AD74, 0x1D), (0x1AD77, 0xFF),
+    (0x1AD78, 0xFF), (0x1AD79, 0xFF), (0x1AD7A, 0xFF), (0x1AD7B, 0xFF),
+    (0x1AD7C, 0xFF), (0x1AD7D, 0x3F), (0x1AD86, 0xB7), (0x1AD87, 0xED),
+    (0x1AD8B, 0xDB), (0x1AD8C, 0xB6), (0x1AD8D, 0x6D), (0x1AD8E, 0x03),
+    (0x1AD94, 0x80), (0x1AD95, 0xFF), (0x1AD96, 0x07), (0x1AD98, 0xE0),
+    (0x1AD99, 0xFF), (0x1AD9A, 0xFF), (0x1AD9B, 0xFF), (0x1AD9C, 0x80),
+    (0x1AD9D, 0x0F), (0x1AD9F, 0xCF), (0x1ADA0, 0xF5), (0x1ADA1, 0x01),
+];

@@ -231,6 +231,66 @@ impl SaveSlot {
         Ok(())
     }
 
+    /// Whether the mission-prep loadout slots (miracle and stew) are open.
+    pub fn loadout_slots(&self) -> bool {
+        self.loadout_slots_offset()
+            .is_some_and(|off| self.data[off] & crate::save::layout::LOADOUT_SLOTS_BIT != 0)
+    }
+
+    /// Opens or closes the mission-prep loadout slots (both the miracle and the
+    /// stew slot, which share one flag — see [`crate::save::layout`]). Which
+    /// miracles are then castable still follows from the miracle key-item tokens.
+    pub fn set_loadout_slots(&mut self, open: bool) -> Result<()> {
+        let off = self.loadout_slots_offset().ok_or_else(|| {
+            Error::Unsupported(format!(
+                "loadout slots are not mapped for {}",
+                self.region.serial()
+            ))
+        })?;
+        if open {
+            self.data[off] |= crate::save::layout::LOADOUT_SLOTS_BIT;
+        } else {
+            self.data[off] &= !crate::save::layout::LOADOUT_SLOTS_BIT;
+        }
+        Ok(())
+    }
+
+    /// Forces every confirmed progression unlock — all drums, every buildable
+    /// unit type, the full mission list, and all boss missions — by OR-ing the
+    /// unlock-accumulator masks into the save's unlock bitfields.
+    ///
+    /// This only ever *sets* bits, and touches only the accumulator bytes, so it
+    /// adds unlocks without disturbing the save's current state (it does not open
+    /// the mission-prep loadout slots, which are a separate flag — see
+    /// [`set_loadout_slots`](Self::set_loadout_slots)). Returns the number of
+    /// bytes it changed.
+    pub fn unlock_all(&mut self) -> Result<usize> {
+        let masks = crate::save::layout::unlock_all_masks(self.region).ok_or_else(|| {
+            Error::Unsupported(format!(
+                "progression unlocks are not mapped for {}",
+                self.region.serial()
+            ))
+        })?;
+        let mut changed = 0;
+        for &(off, mask) in masks {
+            if off >= self.data.len() {
+                continue;
+            }
+            let before = self.data[off];
+            self.data[off] |= mask;
+            if self.data[off] != before {
+                changed += 1;
+            }
+        }
+        Ok(changed)
+    }
+
+    /// The offset of the loadout-slots flag, if mapped and in bounds.
+    fn loadout_slots_offset(&self) -> Option<usize> {
+        let off = crate::save::layout::loadout_slots_offset(self.region)?;
+        (off < self.data.len()).then_some(off)
+    }
+
     /// Reads an inventory record's count, treating a not-owned record as `0`.
     fn inventory_count(&self, off: usize) -> u32 {
         if self.data[off + RECORD_OWNED_FLAG] == INVENTORY_OWNED {

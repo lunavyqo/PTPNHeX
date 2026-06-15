@@ -25,6 +25,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Progression unlocks: `SaveSlot::unlock_all` forces every confirmed unlock —
+  all drums, every buildable unit type, the full mission list, and all boss
+  missions — by OR-ing the unlock-accumulator masks into the `0x1AD70`–`0x1ADB0`
+  bitfields (only setting bits, and only the accumulator bytes, so current state
+  is left intact). Exposed on the CLI as `unlock-all`. Confirmed by a forward
+  unlock-everything test on real hardware.
+- Loadout-slot editing: `SaveSlot::loadout_slots` / `set_loadout_slots` open or
+  close the mission-prep miracle and stew slots (one flag, bit 0 of `0x1A0F0`,
+  controls both). Exposed on the CLI as `set-loadout-slots <on|off>`. Located by
+  hardware bisection; this flag is separate from the unlock bitfields.
 - Key-item editing: `SaveSlot::key_item` / `key_items` / `set_key_item` over the
   19 altar tokens at the head of the inventory table — 4 drums, 4 miracles, 5
   songs, and 6 quest items. These are one-per tokens, so editing toggles their

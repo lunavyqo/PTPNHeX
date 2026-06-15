@@ -442,3 +442,67 @@ fn key_items_match_confirmed_ownership() {
     assert!(!owned("dark-palace-model"), "quest item absent");
     eprintln!("key-item offsets match DATA01's confirmed ownership across all categories");
 }
+
+#[test]
+fn loadout_slots_flag_matches_corpus_and_toggles() {
+    // Anchors the loadout-slot flag (0x1A0F0 bit0) to reality: it is closed on a
+    // pre-slot early save (DATA04) and open on a progressed one (DATA46). Then
+    // checks the setter both opens and closes it.
+    let Some(dir) = saves_dir() else {
+        eprintln!("skipped: set PTPNHEX_SAVES_DIR");
+        return;
+    };
+    let early = SaveSlot::open(dir.join("UCES00995_DATA04"), &KeyProvider::Embedded).unwrap();
+    assert!(
+        !early.loadout_slots(),
+        "DATA04 (early) should have slots closed"
+    );
+    let mut late = SaveSlot::open(dir.join("UCES00995_DATA46"), &KeyProvider::Embedded).unwrap();
+    assert!(
+        late.loadout_slots(),
+        "DATA46 (progressed) should have slots open"
+    );
+
+    late.set_loadout_slots(false).unwrap();
+    assert!(!late.loadout_slots(), "closing should clear the flag");
+    late.set_loadout_slots(true).unwrap();
+    assert!(late.loadout_slots(), "reopening should set the flag");
+    eprintln!("loadout-slot flag matches the corpus and toggles cleanly");
+}
+
+#[test]
+fn unlock_all_sets_every_mask_and_is_idempotent() {
+    // unlock_all only ORs the accumulator masks, so applying it to a near-complete
+    // save (DATA46, which already holds them) changes nothing, and a second pass on
+    // any save is a no-op. On an early save it reports the bytes it sets.
+    use ptpnhex_core::save::layout::unlock_all_masks;
+    let Some(dir) = saves_dir() else {
+        eprintln!("skipped: set PTPNHEX_SAVES_DIR");
+        return;
+    };
+    let mut late = SaveSlot::open(dir.join("UCES00995_DATA46"), &KeyProvider::Embedded).unwrap();
+    assert_eq!(
+        late.unlock_all().unwrap(),
+        0,
+        "DATA46 already has every unlock; nothing should change"
+    );
+
+    let mut early = SaveSlot::open(dir.join("UCES00995_DATA04"), &KeyProvider::Embedded).unwrap();
+    let changed = early.unlock_all().unwrap();
+    assert!(changed > 0, "an early save should gain unlock bits");
+    // Every mask bit must now be present, and a second pass is idempotent.
+    let masks = unlock_all_masks(early.region()).unwrap();
+    for &(off, mask) in masks {
+        assert_eq!(
+            early.data()[off] & mask,
+            mask,
+            "mask not fully set at {off:#x}"
+        );
+    }
+    assert_eq!(
+        early.unlock_all().unwrap(),
+        0,
+        "second pass should be a no-op"
+    );
+    eprintln!("unlock_all set {changed} bytes on DATA04 and is idempotent");
+}

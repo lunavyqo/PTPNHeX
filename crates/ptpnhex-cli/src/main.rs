@@ -91,6 +91,27 @@ enum Command {
         #[arg(long, value_name = "DIR")]
         backup_dir: Option<PathBuf>,
     },
+    /// Open or close the mission-prep loadout slots (miracle and stew, together).
+    SetLoadoutSlots {
+        /// Path to the save directory.
+        dir: PathBuf,
+        /// `on` to open the slots, `off` to close them.
+        state: String,
+        /// Copy the original files into this directory before saving.
+        /// Must be outside the save directory.
+        #[arg(long, value_name = "DIR")]
+        backup_dir: Option<PathBuf>,
+    },
+    /// Force every confirmed unlock: all drums, buildable units, missions, and
+    /// boss missions (does not open the loadout slots — use `set-loadout-slots`).
+    UnlockAll {
+        /// Path to the save directory.
+        dir: PathBuf,
+        /// Copy the original files into this directory before saving.
+        /// Must be outside the save directory.
+        #[arg(long, value_name = "DIR")]
+        backup_dir: Option<PathBuf>,
+    },
     /// Set the save's title — the bold line shown in the PSP save list.
     SetTitle {
         /// Path to the save directory.
@@ -147,6 +168,12 @@ fn main() -> Result<()> {
             state,
             backup_dir,
         } => set_key_item(&dir, &key_item, &state, backup_dir.as_deref()),
+        Command::SetLoadoutSlots {
+            dir,
+            state,
+            backup_dir,
+        } => set_loadout_slots(&dir, &state, backup_dir.as_deref()),
+        Command::UnlockAll { dir, backup_dir } => unlock_all(&dir, backup_dir.as_deref()),
         Command::SetTitle {
             dir,
             title,
@@ -345,6 +372,26 @@ fn set_key_item(dir: &Path, key_item: &str, state: &str, backup_dir: Option<&Pat
 
     back_up_and_save(&slot, backup_dir)?;
     println!("{edited}: {}", if unlocked { "unlocked" } else { "locked" });
+    Ok(())
+}
+
+fn set_loadout_slots(dir: &Path, state: &str, backup_dir: Option<&Path>) -> Result<()> {
+    let open_slots = parse_state(state)?;
+    let mut slot = open(dir)?;
+    slot.set_loadout_slots(open_slots)?;
+    back_up_and_save(&slot, backup_dir)?;
+    println!(
+        "Mission-prep loadout slots: {}",
+        if open_slots { "open" } else { "closed" }
+    );
+    Ok(())
+}
+
+fn unlock_all(dir: &Path, backup_dir: Option<&Path>) -> Result<()> {
+    let mut slot = open(dir)?;
+    let changed = slot.unlock_all()?;
+    back_up_and_save(&slot, backup_dir)?;
+    println!("Forced all progression unlocks ({changed} bytes changed).");
     Ok(())
 }
 
