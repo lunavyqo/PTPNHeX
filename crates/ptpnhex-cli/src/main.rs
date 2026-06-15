@@ -7,7 +7,7 @@ use clap::{Parser, Subcommand};
 use ptpnhex_core::keys::KeyProvider;
 use ptpnhex_core::save::items::ITEM_MAX;
 use ptpnhex_core::save::materials::MATERIAL_MAX;
-use ptpnhex_core::save::{Item, Material};
+use ptpnhex_core::save::{Item, KeyItem, Material};
 use ptpnhex_core::SaveSlot;
 
 /// Save editor for Patapon (PSP).
@@ -73,6 +73,24 @@ enum Command {
         #[arg(long, value_name = "DIR")]
         backup_dir: Option<PathBuf>,
     },
+    /// List the save's key items (drums, miracles, songs, quest items).
+    KeyItems {
+        /// Path to the save directory.
+        dir: PathBuf,
+    },
+    /// Unlock or lock a key item (drum, miracle, song, quest item).
+    SetKeyItem {
+        /// Path to the save directory.
+        dir: PathBuf,
+        /// Key-item slug (for example `earthquake-miracle`), or `all`.
+        key_item: String,
+        /// `on` to unlock, `off` to lock.
+        state: String,
+        /// Copy the original files into this directory before saving.
+        /// Must be outside the save directory.
+        #[arg(long, value_name = "DIR")]
+        backup_dir: Option<PathBuf>,
+    },
     /// Set the save's title — the bold line shown in the PSP save list.
     SetTitle {
         /// Path to the save directory.
@@ -122,6 +140,13 @@ fn main() -> Result<()> {
             value,
             backup_dir,
         } => set_item(&dir, &item, value, backup_dir.as_deref()),
+        Command::KeyItems { dir } => key_items(&dir),
+        Command::SetKeyItem {
+            dir,
+            key_item,
+            state,
+            backup_dir,
+        } => set_key_item(&dir, &key_item, &state, backup_dir.as_deref()),
         Command::SetTitle {
             dir,
             title,
@@ -276,6 +301,50 @@ fn set_item(dir: &Path, item: &str, value: u32, backup_dir: Option<&Path>) -> Re
 
     back_up_and_save(&slot, backup_dir)?;
     println!("{edited}: set to {value}");
+    Ok(())
+}
+
+fn key_items(dir: &Path) -> Result<()> {
+    let slot = open(dir)?;
+    let mut category = "";
+    for (key_item, unlocked) in slot.key_items() {
+        if key_item.category() != category {
+            category = key_item.category();
+            println!("[{category}]");
+        }
+        let mark = if unlocked { "x" } else { " " };
+        println!("  [{mark}] {}", key_item.name());
+    }
+    Ok(())
+}
+
+/// Parses an `on`/`off` (unlock/lock) state argument.
+fn parse_state(state: &str) -> Result<bool> {
+    match state.to_ascii_lowercase().as_str() {
+        "on" | "unlock" | "true" | "1" => Ok(true),
+        "off" | "lock" | "false" | "0" => Ok(false),
+        other => bail!("expected `on` or `off`, got `{other}`"),
+    }
+}
+
+fn set_key_item(dir: &Path, key_item: &str, state: &str, backup_dir: Option<&Path>) -> Result<()> {
+    let unlocked = parse_state(state)?;
+    let mut slot = open(dir)?;
+
+    let edited = if key_item == "all" {
+        for k in KeyItem::all() {
+            slot.set_key_item(k, unlocked)?;
+        }
+        format!("{} key items", KeyItem::all().count())
+    } else {
+        let k = KeyItem::from_slug(key_item)
+            .with_context(|| format!("unknown key item `{key_item}` (try `key-items` to list)"))?;
+        slot.set_key_item(k, unlocked)?;
+        k.name().to_string()
+    };
+
+    back_up_and_save(&slot, backup_dir)?;
+    println!("{edited}: {}", if unlocked { "unlocked" } else { "locked" });
     Ok(())
 }
 

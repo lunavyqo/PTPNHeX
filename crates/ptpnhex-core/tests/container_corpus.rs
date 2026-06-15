@@ -380,3 +380,40 @@ fn item_lists_all_83_and_add_round_trips() {
     fs::remove_dir_all(&root).ok();
     eprintln!("items listed (83) and a never-obtained item added + round-tripped");
 }
+
+#[test]
+fn key_item_lists_all_19_and_unlock_lock_round_trips() {
+    // Key items share the inventory record but are one-per: only the owned flag
+    // matters. Listing yields the full catalog; unlocking then locking a token
+    // survives the disk round trip in both directions.
+    use ptpnhex_core::save::KeyItem;
+    let Some(dir) = saves_dir() else {
+        eprintln!("skipped: set PTPNHEX_SAVES_DIR");
+        return;
+    };
+    let root = temp_root("key-items");
+    let work = working_copy(&dir.join("UCES00995_DATA04"), &root);
+    let quake = KeyItem::from_slug("earthquake-miracle").unwrap();
+    {
+        let slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        assert_eq!(slot.key_items().len(), 19);
+    }
+    {
+        let mut slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        slot.set_key_item(quake, true).unwrap();
+        slot.save().unwrap();
+    }
+    {
+        let slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        assert!(slot.key_item(quake), "unlock survived disk");
+    }
+    {
+        let mut slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        slot.set_key_item(quake, false).unwrap();
+        slot.save().unwrap();
+    }
+    let slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+    assert!(!slot.key_item(quake), "lock survived disk");
+    fs::remove_dir_all(&root).ok();
+    eprintln!("key items listed (19) and unlock/lock round-tripped");
+}

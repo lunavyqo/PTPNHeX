@@ -196,6 +196,39 @@ impl SaveSlot {
         Ok(())
     }
 
+    /// Whether `key_item` (a drum, miracle, song, or quest item) is unlocked.
+    pub fn key_item(&self, key_item: crate::save::KeyItem) -> bool {
+        self.key_item_offset(key_item)
+            .is_some_and(|off| self.data[off + RECORD_OWNED_FLAG] == INVENTORY_OWNED)
+    }
+
+    /// Every key item with whether it is unlocked, in catalog order.
+    pub fn key_items(&self) -> Vec<(crate::save::KeyItem, bool)> {
+        crate::save::KeyItem::all()
+            .map(|k| (k, self.key_item(k)))
+            .collect()
+    }
+
+    /// Unlocks or locks `key_item`. Unlocking flags it owned (and "new" so it
+    /// flashes), matching how the game records a freshly obtained token; locking
+    /// clears the record. Key items are one-per, so the count is fixed at 1.
+    pub fn set_key_item(&mut self, key_item: crate::save::KeyItem, unlocked: bool) -> Result<()> {
+        let off = self.key_item_offset(key_item).ok_or_else(|| {
+            Error::Unsupported(format!(
+                "key items are not mapped for {}",
+                self.region.serial()
+            ))
+        })?;
+        if unlocked {
+            self.set_inventory(off, 1);
+        } else {
+            self.data[off] = 0;
+            self.data[off + RECORD_NEW_FLAG] = 0;
+            self.data[off + RECORD_OWNED_FLAG] = 0;
+        }
+        Ok(())
+    }
+
     /// Reads an inventory record's count, treating a not-owned record as `0`.
     fn inventory_count(&self, off: usize) -> u32 {
         if self.data[off + RECORD_OWNED_FLAG] == INVENTORY_OWNED {
@@ -230,6 +263,13 @@ impl SaveSlot {
     fn item_offset(&self, item: crate::save::Item) -> Option<usize> {
         let offsets = crate::save::layout::item_offsets(self.region)?;
         let off = offsets[item.position()];
+        (off + 4 <= self.data.len()).then_some(off)
+    }
+
+    /// The fixed offset of a key item's inventory record.
+    fn key_item_offset(&self, key_item: crate::save::KeyItem) -> Option<usize> {
+        let offsets = crate::save::layout::key_item_offsets(self.region)?;
+        let off = offsets[key_item.position()];
         (off + 4 <= self.data.len()).then_some(off)
     }
 

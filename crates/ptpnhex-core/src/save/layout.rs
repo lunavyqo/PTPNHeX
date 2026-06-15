@@ -45,6 +45,32 @@ const EU_MATERIAL_OFFSETS: [usize; 20] = [
     0x19D98, 0x19D9C, 0x19DA0, 0x19DA4,
 ];
 
+/// Fixed byte offsets of the 19 key items (drums, miracles, songs, and quest
+/// items), in catalog order, for `region`.
+///
+/// Same fixed-table record as [`material_offsets`]; these are the head records
+/// *before* the materials. They are one-per unlock tokens — only the owned flag
+/// matters, and flipping it genuinely unlocks the token in-game (hardware
+/// confirmed). Mapped for Europe by a distinct-count readback. Only these 19 are
+/// exposed: the records after them in the head block are never-owned/unused and
+/// forcing them owned freezes the altar.
+pub fn key_item_offsets(region: Region) -> Option<&'static [usize; 19]> {
+    match region {
+        Region::Europe => Some(&EU_KEY_ITEM_OFFSETS),
+        Region::NorthAmerica | Region::Japan => None,
+    }
+}
+
+// Paired index-for-index with `key_items::DEFS`, so the offsets are grouped by
+// category (drums, miracles, songs, key items) rather than strictly ascending.
+#[rustfmt::skip]
+const EU_KEY_ITEM_OFFSETS: [usize; 19] = [
+    0x19CE8, 0x19CEC, 0x19CF0, 0x19CF4, // Pon / Pata / Chaka / Don Drum
+    0x19CF8, 0x19CFC, 0x19D00, 0x19D04, // Rain / Tailwind / Storm / Earthquake Miracle
+    0x19D10, 0x19D24, 0x19D28, 0x19D2C, 0x19D30, // Ponpata / Patapata / Ponpon / Chakachaka / Ponchaka Song
+    0x19D08, 0x19D0C, 0x19D14, 0x19D18, 0x19D1C, 0x19D20, // Blank Map / Bent Compass / Dusty Crystal / Broken Sign / Black Star / Dark Palace Model
+];
+
 /// Fixed byte offsets of the 83 inventory items (stews, Memories, and the
 /// weapon/gear armory), in catalog order, for `region`.
 ///

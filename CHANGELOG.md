@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Key-item editing: `SaveSlot::key_item` / `key_items` / `set_key_item` over the
+  19 altar unlock tokens at the head of the inventory table — 4 drums, 4
+  miracles, 5 songs, and 6 quest items. Unlike materials and items these are
+  one-per tokens, so editing just unlocks or locks them; flipping the owned flag
+  genuinely unlocks the token in-game (confirmed on hardware — flagging a
+  never-obtained Earthquake Miracle made it performable in a mission). Only the
+  19 valid tokens are exposed (the unused slots after them freeze the altar).
+  Exposed on the CLI as `key-items` (list, grouped by category) and
+  `set-key-item <slug|all> <on|off>`.
 - Item editing: `SaveSlot::item` / `items` / `set_item` over the 83 inventory
   items after the materials — 4 stews, the 6 unit Memories, and the full
   weapon/gear armory (spears, swords, scythe, shields, bows, halberds, horses,
