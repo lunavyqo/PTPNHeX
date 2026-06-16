@@ -31,25 +31,65 @@ A full game save's payload is 205520 bytes and falls into three broad regions:
 
 | range             | contents                                                    |
 | ----------------- | ----------------------------------------------------------- |
-| `0x0000`–`0x1000` | header: assorted counters and progress values              |
-| `0x1000`–`0x19000`| **unit / equipment array** — fixed-size records (see below) |
+| `0x0000`–`0x0020` | header: counters and progress values (see below)           |
+| `0x0020`–`0x7D0C` | **army roster** — fixed-size unit records (see below)      |
 | `0x19CE8`–`0x1A0E0`| **inventory table** — fixed per-item records (see below)    |
-| `0x1A0EC`–end     | numeric stats (ka-ching) and other fields                  |
+| `0x1A0EC`–end     | numeric stats (ka-ching), progress flags, and other fields |
 
-### The unit / equipment array
+### The army roster array
 
-From `0x1000` the save holds a regular array of **fixed-size records, one every
-`0x104` (260) bytes**, with no exceptions. Each record carries ASCII identifiers
-for a unit and its gear, for example:
+From `0x0020` the save holds the player's army as a regular array of
+**fixed-size records, one every `0x104` (260) bytes**, with no exceptions. The
+array has a **fixed capacity of 123 records** (so it reserves `0x0020`–`0x7D0C`);
+only the first *N* are filled, where *N* is the current army size — `5` units on
+a fresh save, growing monotonically to `27` by the end of the corpus. The
+remaining records are zeroed reserve.
+
+The header just before it carries the army size: the `u32` at **`0x14`** is the
+unit count (matching the filled-record count on most saves), and the constant
+`123` at `0x08`/`0x0C` is the capacity. (`0x00` is the missions counter; `0x04`
+is a constant `2`.)
+
+Each record carries ASCII identifiers for a unit and its equipped gear at fixed
+record-relative offsets, each preceded by a 4-byte hash:
+
+| offset | field |
+| --- | --- |
+| `+0x00` | a name slot (`none` when unnamed) |
+| `+0x50` | `unitNNN_01_01` — the class |
+| `+0x74` | `wpnNNN_III_VV` / `rwpnNNN_III_VV` — equipped weapon (or rare weapon) |
+| `+0xA4` | `hlmNNN_II` — equipped helmet |
+| `+0xD4` | `sldNNN_II` — equipped shield (shield units only) |
 
 ```
-unit004_01_01   wpn004_003_01   hlm014_01          (a unit + weapon + helmet)
-unit003_01_01   rwpn003_009_01  hlm015_01  sld008_01 (… with a rare weapon + shield)
+unit002_01_01   wpn001_008_01   hlm014_01          (a Yaripon + spear + helmet)
+unit003_01_01   rwpn003_009_01  hlm015_01  sld008_01 (a Tatepon + rare weapon + shield)
 ```
 
-Identifier prefixes: `unit` (unit type), `wpn` / `rwpn` (weapon / rare weapon),
-`hlm` (helmet), `sld` (shield). Because every record has the same shape,
-decoding one record decodes them all.
+The `NNN` in a class id selects the unit type, identified by the weapon family it
+carries:
+
+| class id | weapon | unit |
+| --- | --- | --- |
+| `unit002` | `wpn001` (spears) | Yaripon |
+| `unit003` | `rwpn003` + `sld` | Tatepon |
+| `unit004` | `wpn004` (bows) | Yumipon |
+| `unit006` | `wpn006` | Kibapon |
+| `unit007` | `wpn007` (hammers) | Dekapon |
+| `unit008` | `wpn008` (horns) | Megapon |
+
+The equipped-gear ids reuse the **same family/index taxonomy as the inventory
+armory** — `wpn001_008` is the spear family, item 8 (the eighth spear catalogued
+under *Items*) — so units and the armory share one item-id space. Between the
+identifiers each record also holds numeric fields (unit level and stats); those
+are not yet individually decoded.
+
+A second, **smaller** set of unit records appears near `0x30000`. It is **not** a
+copy of the roster: it holds verbatim copies of *some* unit records but in a
+different order and count (on the endgame save, 27 roster records versus 21 here,
+with a different class composition), so it is most likely the **deployed
+battle-formation** arrangement rather than a backup. Its exact layout is not yet
+mapped.
 
 ## Confirmed fields
 
@@ -314,14 +354,16 @@ separate **progression system**. Several pieces of it are mapped: the unit roste
 array, the mission counter, the master unlock bitfields, and the mission-prep
 loadout-slot flag.
 
-### The unit roster array (`~0x40`–`0x19000`)
+### The army roster array (`0x0020`–`0x7D0C`)
 
-From near the start of the payload, the save holds the player's unit/equipment
-roster as **fixed `0x104`-byte records**, each carrying `unit###_##_##` /
-`wpn###` / `rwpn###` / `hlm###` / `sld###` ASCII identifiers (see *Overall
-structure*). Records fill in as units are recruited, and their stat/level bytes
-only grow over a playthrough. A **second copy** of this array lives at
-`0x30000+`. (This is the roster, not the *buildable* gate — see below.)
+From `0x0020` the save holds the player's army as fixed `0x104`-byte unit records
+(detailed under *Overall structure*): a 123-record capacity with the first *N*
+filled, where *N* (the army size, also at `0x14`) grows from 5 to 27 across the
+corpus as units are recruited. Each record names the unit's class and its
+equipped weapon, helmet, and shield, with numeric level/stat fields between. A
+separate, reordered set of unit records near `0x30000` is most likely the
+deployed formation, not a copy. (This is the roster, not the *buildable* gate —
+unit-building is gated by the unlock bitfields below.)
 
 ### The mission counter (`0x0`)
 

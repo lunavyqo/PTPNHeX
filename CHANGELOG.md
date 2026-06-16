@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- Documented the army roster array in `docs/save-format.md`: the fixed
+  123-record (`0x104`-byte) array from `0x0020` with the first *N* filled (the
+  army size, also at `0x14`, grows 5→27 across the corpus), the per-record
+  field layout (class, equipped weapon/helmet/shield, numeric stats), the six
+  unit classes mapped by weapon family, and the note that the records near
+  `0x30000` are a reordered formation rather than a copy. Corrects the earlier
+  coarse `0x1000`–`0x19000` estimate and the "second copy" assumption.
 - Expanded the *Progress and mission unlocks* section of `docs/save-format.md`
   with the byte-level decode of the `0x1AD70`–`0x1ADB0` unlock bitfields
   (separating the unlock-accumulator bytes from volatile current-state),
