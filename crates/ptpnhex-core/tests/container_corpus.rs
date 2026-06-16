@@ -506,3 +506,44 @@ fn unlock_all_sets_every_mask_and_is_idempotent() {
     );
     eprintln!("unlock_all set {changed} bytes on DATA04 and is idempotent");
 }
+
+#[test]
+fn army_roster_reads_and_rarepon_round_trips() {
+    // Reads the roster of a progressed save, checks every unit has a known class
+    // and rarepon code, and round-trips set_unit_rarepon on a working copy (no
+    // hardcoded anchor, so it is robust to the live corpus drifting).
+    use ptpnhex_core::save::Rarepon;
+    let Some(dir) = saves_dir() else {
+        eprintln!("skipped: set PTPNHEX_SAVES_DIR");
+        return;
+    };
+    let root = temp_root("rarepon");
+    let work = working_copy(&dir.join("UCES00995_DATA46"), &root);
+
+    {
+        let slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        let n = slot.army_size();
+        assert!(n > 0, "a progressed save should have units");
+        for i in 0..n {
+            assert!(slot.unit_class(i).is_some(), "unit {i} has a class");
+            assert!(
+                slot.unit_rarepon_code(i).is_some(),
+                "unit {i} has a rarepon code"
+            );
+        }
+        // Past the army, slots are empty.
+        assert!(slot.unit_class(n).is_none(), "slot after the army is empty");
+    }
+
+    // Round-trip: set unit 0 to each known rarepon through disk and read it back.
+    for rarepon in Rarepon::all() {
+        let mut slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        slot.set_unit_rarepon(0, rarepon).unwrap();
+        slot.save().unwrap();
+        let slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        assert_eq!(slot.unit_rarepon(0), Some(rarepon));
+        assert_eq!(slot.unit_rarepon_code(0), Some(rarepon.code()));
+    }
+    fs::remove_dir_all(&root).ok();
+    eprintln!("army roster read and rarepon set/get round-tripped through disk");
+}

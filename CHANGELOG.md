@@ -38,6 +38,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Unit rarepon editing: `SaveSlot::army_size` / `unit_class` / `unit_rarepon` /
+  `unit_rarepon_code` / `set_unit_rarepon` read and edit each roster unit's
+  rarepon (the `u32` at record offset `+0x48`), with a `Rarepon` catalog of the
+  confirmed variants (Barsala, Mogyoon, Tikulee, Mofeel, Pyokola, Gekolos, and
+  basic). Exposed on the CLI as `units` (list the army with each unit's class and
+  rarepon) and `set-rarepon <index> <slug>`. Editing only `+0x48` yields a
+  body-only hybrid, matching the hardware-confirmed behaviour.
 - Progression unlocks: `SaveSlot::unlock_all` forces every confirmed unlock —
   all drums, every buildable unit type, the full mission list, and all boss
   missions — by OR-ing the unlock-accumulator masks into the `0x1AD70`–`0x1ADB0`

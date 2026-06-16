@@ -7,7 +7,7 @@ use clap::{Parser, Subcommand};
 use ptpnhex_core::keys::KeyProvider;
 use ptpnhex_core::save::items::ITEM_MAX;
 use ptpnhex_core::save::materials::MATERIAL_MAX;
-use ptpnhex_core::save::{Item, KeyItem, Material};
+use ptpnhex_core::save::{Item, KeyItem, Material, Rarepon};
 use ptpnhex_core::SaveSlot;
 
 /// Save editor for Patapon (PSP).
@@ -91,6 +91,24 @@ enum Command {
         #[arg(long, value_name = "DIR")]
         backup_dir: Option<PathBuf>,
     },
+    /// List the army roster: each unit's index, class, and rarepon.
+    Units {
+        /// Path to the save directory.
+        dir: PathBuf,
+    },
+    /// Set a unit's rarepon by its roster index (see `units`).
+    SetRarepon {
+        /// Path to the save directory.
+        dir: PathBuf,
+        /// Roster index of the unit (from `units`).
+        index: usize,
+        /// Rarepon slug (for example `mogyoon`), or `list` to show the choices.
+        rarepon: String,
+        /// Copy the original files into this directory before saving.
+        /// Must be outside the save directory.
+        #[arg(long, value_name = "DIR")]
+        backup_dir: Option<PathBuf>,
+    },
     /// Open or close the mission-prep loadout slots (miracle and stew, together).
     SetLoadoutSlots {
         /// Path to the save directory.
@@ -168,6 +186,13 @@ fn main() -> Result<()> {
             state,
             backup_dir,
         } => set_key_item(&dir, &key_item, &state, backup_dir.as_deref()),
+        Command::Units { dir } => units(&dir),
+        Command::SetRarepon {
+            dir,
+            index,
+            rarepon,
+            backup_dir,
+        } => set_rarepon(&dir, index, &rarepon, backup_dir.as_deref()),
         Command::SetLoadoutSlots {
             dir,
             state,
@@ -372,6 +397,55 @@ fn set_key_item(dir: &Path, key_item: &str, state: &str, backup_dir: Option<&Pat
 
     back_up_and_save(&slot, backup_dir)?;
     println!("{edited}: {}", if unlocked { "unlocked" } else { "locked" });
+    Ok(())
+}
+
+fn units(dir: &Path) -> Result<()> {
+    let slot = open(dir)?;
+    let n = slot.army_size();
+    println!("Army: {n} units");
+    for i in 0..n {
+        let class = slot.unit_class(i).unwrap_or("Unknown");
+        let rarepon = slot.unit_rarepon(i).map_or_else(
+            || {
+                slot.unit_rarepon_code(i)
+                    .map_or_else(|| "-".to_string(), |c| format!("unknown ({c:#010X})"))
+            },
+            |r| r.name().to_string(),
+        );
+        println!("  [{i:>3}] {class:<8} {rarepon}");
+    }
+    Ok(())
+}
+
+fn rarepon_choices() -> String {
+    Rarepon::all()
+        .map(|r| r.slug())
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn set_rarepon(dir: &Path, index: usize, rarepon: &str, backup_dir: Option<&Path>) -> Result<()> {
+    if rarepon == "list" {
+        println!("rarepons: {}", rarepon_choices());
+        return Ok(());
+    }
+    let r = Rarepon::from_slug(rarepon).with_context(|| {
+        format!(
+            "unknown rarepon `{rarepon}` (choices: {})",
+            rarepon_choices()
+        )
+    })?;
+    let mut slot = open(dir)?;
+    if slot.unit_class(index).is_none() {
+        bail!(
+            "no unit at roster index {index} (army has {} units; see `units`)",
+            slot.army_size()
+        );
+    }
+    slot.set_unit_rarepon(index, r)?;
+    back_up_and_save(&slot, backup_dir)?;
+    println!("Unit {index}: rarepon set to {}", r.name());
     Ok(())
 }
 

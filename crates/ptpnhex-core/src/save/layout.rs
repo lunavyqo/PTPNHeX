@@ -101,6 +101,30 @@ const EU_ITEM_OFFSETS: [usize; 83] = [
     0x19FC8, 0x19FCC, 0x19FD0,
 ];
 
+/// The army roster: fixed-size unit records, one every
+/// [`ROSTER_STRIDE`](self::ROSTER_STRIDE) bytes from [`ROSTER_BASE`](self::ROSTER_BASE),
+/// with a fixed [`ROSTER_CAPACITY`](self::ROSTER_CAPACITY). Only the first *N* are
+/// filled (the army size); the rest are zeroed reserve. See `docs/save-format.md`.
+pub const ROSTER_BASE: usize = 0x20;
+/// Distance between consecutive unit records.
+pub const ROSTER_STRIDE: usize = 0x104;
+/// Number of unit records the array reserves room for.
+pub const ROSTER_CAPACITY: usize = 123;
+/// Record-relative offset of a unit's class id (`unitNNN_…` ASCII).
+pub const RECORD_UNIT_ID: usize = 0x50;
+/// Record-relative offset of the rarepon id (`u32` LE — see
+/// [`rarepon`](crate::save::rarepon)).
+pub const RECORD_RAREPON: usize = 0x48;
+
+/// Byte offset of unit record `index` for `region`, if that index is within the
+/// roster capacity.
+pub fn roster_record_offset(region: Region, index: usize) -> Option<usize> {
+    match region {
+        Region::Europe => (index < ROSTER_CAPACITY).then(|| ROSTER_BASE + index * ROSTER_STRIDE),
+        Region::NorthAmerica | Region::Japan => None,
+    }
+}
+
 /// Bit (within the byte at [`loadout_slots_offset`]) that opens the mission-prep
 /// miracle and stew slots together.
 pub const LOADOUT_SLOTS_BIT: u8 = 0x01;

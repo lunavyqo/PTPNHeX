@@ -291,6 +291,61 @@ impl SaveSlot {
         (off < self.data.len()).then_some(off)
     }
 
+    /// The number of units in the army roster (filled records from the start).
+    pub fn army_size(&self) -> usize {
+        (0..crate::save::layout::ROSTER_CAPACITY)
+            .take_while(|&i| self.unit_record(i).is_some())
+            .count()
+    }
+
+    /// The class name of unit `index` (for example `"Yaripon"`), or `None` if the
+    /// roster slot is empty.
+    pub fn unit_class(&self, index: usize) -> Option<&'static str> {
+        let base = self.unit_record(index)?;
+        let id = &self.data[base + crate::save::layout::RECORD_UNIT_ID..][..7];
+        Some(unit_class_name(id))
+    }
+
+    /// The raw rarepon code at unit `index`, or `None` if the slot is empty.
+    pub fn unit_rarepon_code(&self, index: usize) -> Option<u32> {
+        let base = self.unit_record(index)?;
+        let off = base + crate::save::layout::RECORD_RAREPON;
+        Some(u32::from_le_bytes(
+            self.data[off..off + 4].try_into().expect("4 bytes"),
+        ))
+    }
+
+    /// The rarepon of unit `index`, if the slot is filled and its code is one of
+    /// the known rarepons.
+    pub fn unit_rarepon(&self, index: usize) -> Option<crate::save::Rarepon> {
+        self.unit_rarepon_code(index)
+            .and_then(crate::save::Rarepon::from_code)
+    }
+
+    /// Sets unit `index`'s rarepon, writing its id at record offset `+0x48`.
+    pub fn set_unit_rarepon(&mut self, index: usize, rarepon: crate::save::Rarepon) -> Result<()> {
+        let base = self.unit_record(index).ok_or_else(|| {
+            Error::Unsupported(format!(
+                "no unit at roster index {index} for {}",
+                self.region.serial()
+            ))
+        })?;
+        let off = base + crate::save::layout::RECORD_RAREPON;
+        self.data[off..off + 4].copy_from_slice(&rarepon.code().to_le_bytes());
+        Ok(())
+    }
+
+    /// The byte offset of unit `index`'s record if the slot is filled (its class
+    /// id begins with `unit`), else `None`.
+    fn unit_record(&self, index: usize) -> Option<usize> {
+        let base = crate::save::layout::roster_record_offset(self.region, index)?;
+        if base + crate::save::layout::ROSTER_STRIDE > self.data.len() {
+            return None;
+        }
+        let id = &self.data[base + crate::save::layout::RECORD_UNIT_ID..][..4];
+        (id == b"unit").then_some(base)
+    }
+
     /// Reads an inventory record's count, treating a not-owned record as `0`.
     fn inventory_count(&self, off: usize) -> u32 {
         if self.data[off + RECORD_OWNED_FLAG] == INVENTORY_OWNED {
@@ -466,6 +521,19 @@ fn find_file_row(list: &[u8], name: &str) -> Option<usize> {
         off += FILE_ROW_LEN;
     }
     None
+}
+
+/// Maps a unit class id prefix (`unitNNN`) to its class name.
+fn unit_class_name(id: &[u8]) -> &'static str {
+    match id {
+        b"unit002" => "Yaripon",
+        b"unit003" => "Tatepon",
+        b"unit004" => "Yumipon",
+        b"unit006" => "Kibapon",
+        b"unit007" => "Dekapon",
+        b"unit008" => "Megapon",
+        _ => "Unknown",
+    }
 }
 
 /// Whether two paths refer to the same directory, comparing canonical forms

@@ -7,9 +7,11 @@ pub mod items;
 pub mod key_items;
 pub mod layout;
 pub mod materials;
+pub mod rarepon;
 mod region;
 
 pub use items::Item;
 pub use key_items::KeyItem;
 pub use materials::Material;
+pub use rarepon::Rarepon;
 pub use region::Region;
