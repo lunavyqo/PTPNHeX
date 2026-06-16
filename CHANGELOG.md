@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- Documented the per-unit **rarepon** field in `docs/save-format.md`: the `u32`
+  at record offset `+0x48` holds the rarepon id (a 32-bit name-hash) that sets a
+  unit's body/appearance, with a table of the confirmed body codes (Barsala,
+  Mogyoon, Tikulee, Mofeel, Pyokola, Gekolos, and none/basic). Hardware-confirmed
+  in both directions and cross-class. Also noted that the `u32` at `+0xC4` is the
+  equipped helmet's name-hash, not a unit attribute.
 - Documented the army roster array in `docs/save-format.md`: the fixed
   123-record (`0x104`-byte) array from `0x0020` with the first *N* filled (the
   army size, also at `0x14`, grows 5→27 across the corpus), the per-record

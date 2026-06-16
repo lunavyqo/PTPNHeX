@@ -82,7 +82,34 @@ The equipped-gear ids reuse the **same family/index taxonomy as the inventory
 armory** — `wpn001_008` is the spear family, item 8 (the eighth spear catalogued
 under *Items*) — so units and the armory share one item-id space. Between the
 identifiers each record also holds numeric fields (unit level and stats); those
-are not yet individually decoded.
+are not yet individually decoded. (One field nearby, the `u32` at `+0xC4`, is the
+**name-hash of the equipped helmet** — `hlm015`→`0xDA216E8F`, `hlm014`→`0x629D09EA`,
+and so on — not a unit attribute.)
+
+#### Rarepon (the `u32` at `+0x48`)
+
+The `u32` at record offset `+0x48` (just before the class id) is the unit's
+**rarepon** — the special variant that sets its body/appearance. It was confirmed
+on hardware in both directions: writing another rarepon's code makes the body
+change to that rarepon (working across every class), and recreating the unit as a
+plain Barsala reverts the code. Each value is a 32-bit name-hash (the high byte is
+always `0xFF`); the codes are shared across classes, so the same value is the same
+rarepon whether on a Yaripon, a Megapon, or any other unit:
+
+| code (`u32` LE) | rarepon |
+| --- | --- |
+| `0xFFCDFEBE` | Barsala |
+| `0xFFC06E9F` | Mogyoon |
+| `0xFFA96D65` | Tikulee |
+| `0xFFF898CF` | Mofeel |
+| `0xFF356EEF` | Pyokola |
+| `0xFF61E4DA` | Gekolos |
+| `0xFFFFFFFF` | none / basic |
+
+This is the only per-unit field that tracks the rarepon: a unit's displayed name,
+headpiece, and base stats are derived from this id rather than stored alongside it,
+so editing `+0x48` alone produces an otherwise-Barsala unit wearing a different
+rarepon's body — a combination the game cannot normally create.
 
 A second, **smaller** set of unit records appears near `0x30000`. It is **not** a
 copy of the roster: it holds verbatim copies of *some* unit records but in a
