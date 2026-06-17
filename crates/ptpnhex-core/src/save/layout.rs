@@ -143,6 +143,32 @@ pub fn loadout_slots_offset(region: Region) -> Option<usize> {
     }
 }
 
+/// `(offset, bit-pair mask)` for each bonus Patapon's revive flag for `region`,
+/// paired index-for-index with [`crate::save::bonus_patapon`]'s catalog.
+///
+/// Each bonus Patapon occupies a two-bit pair in the unlock region; reviving it
+/// sets both bits. Setting the mask grants that Patapon (and its minigame, plus
+/// Kibapon production for Kimpon); clearing it removes them. Confirmed for Europe
+/// on hardware for all five (see `docs/save-format.md`). These pairs are a subset
+/// of the bits [`unlock_all_masks`] already sets, so this is the per-Patapon
+/// scalpel to `unlock_all`'s sledgehammer.
+pub fn bonus_patapon_flags(region: Region) -> Option<&'static [(usize, u8); 5]> {
+    match region {
+        Region::Europe => Some(&EU_BONUS_PATAPON_FLAGS),
+        Region::NorthAmerica | Region::Japan => None,
+    }
+}
+
+// Paired index-for-index with `bonus_patapon::DEFS` (revive order).
+#[rustfmt::skip]
+const EU_BONUS_PATAPON_FLAGS: [(usize, u8); 5] = [
+    (0x1AD71, 0x30), // Pakapon      — 0x1AD71 bits 4,5
+    (0x1AD71, 0xC0), // Kimpon       — 0x1AD71 bits 6,7 (also unlocks Kibapon)
+    (0x1AD72, 0x03), // Fah Zakpon   — 0x1AD72 bits 0,1
+    (0x1AD72, 0x0C), // Rah Gashapon — 0x1AD72 bits 2,3
+    (0x1AD72, 0x30), // Kampon       — 0x1AD72 bits 4,5
+];
+
 /// `(offset, OR-mask)` pairs that, applied to the save's unlock bitfields, set
 /// every confirmed unlock for `region` — all drums, every buildable unit type,
 /// the full mission list, and all boss missions.

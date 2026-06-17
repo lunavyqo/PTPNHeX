@@ -7,7 +7,7 @@ use clap::{Parser, Subcommand};
 use ptpnhex_core::keys::KeyProvider;
 use ptpnhex_core::save::items::ITEM_MAX;
 use ptpnhex_core::save::materials::MATERIAL_MAX;
-use ptpnhex_core::save::{Item, KeyItem, Material, Rarepon};
+use ptpnhex_core::save::{BonusPatapon, Item, KeyItem, Material, Rarepon};
 use ptpnhex_core::SaveSlot;
 
 /// Save editor for Patapon (PSP).
@@ -130,6 +130,25 @@ enum Command {
         #[arg(long, value_name = "DIR")]
         backup_dir: Option<PathBuf>,
     },
+    /// List the bonus Patapons (Patapolis revivals) and whether each is revived.
+    BonusPatapons {
+        /// Path to the save directory.
+        dir: PathBuf,
+    },
+    /// Revive or remove a bonus Patapon, toggling its minigame (and, for Kimpon,
+    /// Kibapon production).
+    SetBonusPatapon {
+        /// Path to the save directory.
+        dir: PathBuf,
+        /// Bonus-Patapon slug (for example `kimpon`), or `all`.
+        patapon: String,
+        /// `on` to revive, `off` to remove.
+        state: String,
+        /// Copy the original files into this directory before saving.
+        /// Must be outside the save directory.
+        #[arg(long, value_name = "DIR")]
+        backup_dir: Option<PathBuf>,
+    },
     /// Set the save's title — the bold line shown in the PSP save list.
     SetTitle {
         /// Path to the save directory.
@@ -199,6 +218,13 @@ fn main() -> Result<()> {
             backup_dir,
         } => set_loadout_slots(&dir, &state, backup_dir.as_deref()),
         Command::UnlockAll { dir, backup_dir } => unlock_all(&dir, backup_dir.as_deref()),
+        Command::BonusPatapons { dir } => bonus_patapons(&dir),
+        Command::SetBonusPatapon {
+            dir,
+            patapon,
+            state,
+            backup_dir,
+        } => set_bonus_patapon(&dir, &patapon, &state, backup_dir.as_deref()),
         Command::SetTitle {
             dir,
             title,
@@ -466,6 +492,47 @@ fn unlock_all(dir: &Path, backup_dir: Option<&Path>) -> Result<()> {
     let changed = slot.unlock_all()?;
     back_up_and_save(&slot, backup_dir)?;
     println!("Forced all progression unlocks ({changed} bytes changed).");
+    Ok(())
+}
+
+/// Lists the bonus Patapons and whether each is revived.
+fn bonus_patapons(dir: &Path) -> Result<()> {
+    let slot = open(dir)?;
+    for (bp, revived) in slot.bonus_patapons() {
+        let mark = if revived { "x" } else { " " };
+        match bp.minigame() {
+            Some(minigame) => println!("  [{mark}] {} ({minigame})", bp.name()),
+            None => println!("  [{mark}] {}", bp.name()),
+        }
+    }
+    Ok(())
+}
+
+/// Revives or removes a bonus Patapon (or all of them).
+fn set_bonus_patapon(
+    dir: &Path,
+    patapon: &str,
+    state: &str,
+    backup_dir: Option<&Path>,
+) -> Result<()> {
+    let revived = parse_state(state)?;
+    let mut slot = open(dir)?;
+
+    let edited = if patapon == "all" {
+        for bp in BonusPatapon::all() {
+            slot.set_bonus_patapon(bp, revived)?;
+        }
+        format!("{} bonus Patapons", BonusPatapon::all().count())
+    } else {
+        let bp = BonusPatapon::from_slug(patapon).with_context(|| {
+            format!("unknown bonus Patapon `{patapon}` (try `bonus-patapons` to list)")
+        })?;
+        slot.set_bonus_patapon(bp, revived)?;
+        bp.name().to_string()
+    };
+
+    back_up_and_save(&slot, backup_dir)?;
+    println!("{edited}: {}", if revived { "revived" } else { "removed" });
     Ok(())
 }
 

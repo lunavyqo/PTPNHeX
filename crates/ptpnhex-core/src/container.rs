@@ -285,6 +285,49 @@ impl SaveSlot {
         Ok(changed)
     }
 
+    /// Whether `bonus_patapon` is revived (its unlock bit-pair is set).
+    pub fn bonus_patapon(&self, bonus_patapon: crate::save::BonusPatapon) -> bool {
+        self.bonus_patapon_flag(bonus_patapon)
+            .is_some_and(|(off, mask)| self.data[off] & mask == mask)
+    }
+
+    /// Every bonus Patapon with whether it is revived, in catalog order.
+    pub fn bonus_patapons(&self) -> Vec<(crate::save::BonusPatapon, bool)> {
+        crate::save::BonusPatapon::all()
+            .map(|b| (b, self.bonus_patapon(b)))
+            .collect()
+    }
+
+    /// Revives or removes `bonus_patapon` by setting or clearing its unlock
+    /// bit-pair — granting or removing that Patapon's minigame (and, for Kimpon,
+    /// Kibapon production). Whether a revived Patapon visibly appears also depends
+    /// on the save's current story position (see [`crate::save::bonus_patapon`]).
+    pub fn set_bonus_patapon(
+        &mut self,
+        bonus_patapon: crate::save::BonusPatapon,
+        revived: bool,
+    ) -> Result<()> {
+        let (off, mask) = self.bonus_patapon_flag(bonus_patapon).ok_or_else(|| {
+            Error::Unsupported(format!(
+                "bonus Patapons are not mapped for {}",
+                self.region.serial()
+            ))
+        })?;
+        if revived {
+            self.data[off] |= mask;
+        } else {
+            self.data[off] &= !mask;
+        }
+        Ok(())
+    }
+
+    /// The `(offset, mask)` of a bonus Patapon's flag, if mapped and in bounds.
+    fn bonus_patapon_flag(&self, bonus_patapon: crate::save::BonusPatapon) -> Option<(usize, u8)> {
+        let flags = crate::save::layout::bonus_patapon_flags(self.region)?;
+        let (off, mask) = flags[bonus_patapon.position()];
+        (off < self.data.len()).then_some((off, mask))
+    }
+
     /// The offset of the loadout-slots flag, if mapped and in bounds.
     fn loadout_slots_offset(&self) -> Option<usize> {
         let off = crate::save::layout::loadout_slots_offset(self.region)?;

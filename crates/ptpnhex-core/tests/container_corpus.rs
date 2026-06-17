@@ -508,6 +508,39 @@ fn unlock_all_sets_every_mask_and_is_idempotent() {
 }
 
 #[test]
+fn bonus_patapons_match_corpus_and_toggle() {
+    // A complete save (DATA46) has every bonus Patapon revived; an early save
+    // (DATA04, 0:17) lacks the ones revived later (e.g. Kampon, revived last).
+    // The setter both revives and removes a pair.
+    use ptpnhex_core::save::BonusPatapon;
+    let Some(dir) = saves_dir() else {
+        eprintln!("skipped: set PTPNHEX_SAVES_DIR");
+        return;
+    };
+    let mut late = SaveSlot::open(dir.join("UCES00995_DATA46"), &KeyProvider::Embedded).unwrap();
+    for (bp, revived) in late.bonus_patapons() {
+        assert!(revived, "DATA46 should have {} revived", bp.name());
+    }
+
+    let kimpon = BonusPatapon::from_slug("kimpon").unwrap();
+    late.set_bonus_patapon(kimpon, false).unwrap();
+    assert!(
+        !late.bonus_patapon(kimpon),
+        "removing should clear the pair"
+    );
+    late.set_bonus_patapon(kimpon, true).unwrap();
+    assert!(late.bonus_patapon(kimpon), "reviving should set the pair");
+
+    let early = SaveSlot::open(dir.join("UCES00995_DATA04"), &KeyProvider::Embedded).unwrap();
+    let kampon = BonusPatapon::from_slug("kampon").unwrap();
+    assert!(
+        !early.bonus_patapon(kampon),
+        "DATA04 (early) should not have Kampon (revived last)"
+    );
+    eprintln!("bonus Patapon flags match the corpus and toggle");
+}
+
+#[test]
 fn army_roster_reads_and_rarepon_round_trips() {
     // Reads the roster of a progressed save, checks every unit has a known class
     // and rarepon code, and round-trips set_unit_rarepon on a working copy (no

@@ -63,6 +63,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Bonus-Patapon editing: `SaveSlot::bonus_patapon` / `bonus_patapons` /
+  `set_bonus_patapon` revive or remove each of the five Patapolis bonus Patapons
+  (Pakapon, Kimpon, Fah Zakpon, Rah Gashapon, Kampon) by toggling its unlock
+  bit-pair, granting or removing that Patapon's minigame (and, for Kimpon, Kibapon
+  production). A `BonusPatapon` catalog backs them, with the region-aware
+  `(offset, bit-pair mask)` table in `layout::bonus_patapon_flags`. Exposed on the
+  CLI as `bonus-patapons` (list with revived status) and
+  `set-bonus-patapon <slug|all> <on|off>` — the per-Patapon scalpel to
+  `unlock-all`'s sledgehammer. All five pairs hardware-confirmed.
 - Unit rarepon editing: `SaveSlot::army_size` / `unit_class` / `unit_rarepon` /
   `unit_rarepon_code` / `set_unit_rarepon` read and edit each roster unit's
   rarepon (the `u32` at record offset `+0x48`), with a `Rarepon` catalog of the
