@@ -56,11 +56,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rarepon) and `set-rarepon <index> <slug>`. Editing only `+0x48` yields a
   body-only hybrid, matching the hardware-confirmed behaviour.
 - Progression unlocks: `SaveSlot::unlock_all` forces every confirmed unlock —
-  all drums, every buildable unit type, the full mission list, and all boss
-  missions — by OR-ing the unlock-accumulator masks into the `0x1AD70`–`0x1ADB0`
-  bitfields (only setting bits, and only the accumulator bytes, so current state
-  is left intact). Exposed on the CLI as `unlock-all`. Confirmed by a forward
-  unlock-everything test on real hardware.
+  all drums, every buildable unit type (including the mission-gated classes such
+  as Kibapon), the full mission list, all boss missions, and every bonus-Patapon
+  minigame — by OR-ing the unlock-accumulator masks into the `0x1AD70`–`0x1ADB0`
+  bitfields. The masks are **bit-precise**: where a byte mixes accumulator bits
+  with volatile current-state bits, only the accumulator bits are set, so current
+  state is left intact and OR-ing can only add unlocks. Exposed on the CLI as
+  `unlock-all`. Confirmed by forward unlock-everything tests on real hardware,
+  including the `0x1AD71` bit 6 gate (Sandy Paradise) that opens the fifth bonus
+  minigame and Kibapon production — the one the earlier byte-granular mask missed.
 - Loadout-slot editing: `SaveSlot::loadout_slots` / `set_loadout_slots` open or
   close the mission-prep miracle and stew slots (one flag, bit 0 of `0x1A0F0`,
   controls both). Exposed on the CLI as `set-loadout-slots <on|off>`. Located by

@@ -147,13 +147,16 @@ pub fn loadout_slots_offset(region: Region) -> Option<usize> {
 /// every confirmed unlock for `region` — all drums, every buildable unit type,
 /// the full mission list, and all boss missions.
 ///
-/// These cover only the **unlock-accumulator** bytes of the `0x1AD70`–`0x1ADB0`
-/// region (the bits that strictly accumulate across a playthrough); the volatile
-/// current-state bytes interleaved in that span are deliberately excluded so a
-/// forced unlock does not disturb the save's current state. OR-ing the masks can
-/// only set bits, never clear them. Each mask is the union of that byte across the
-/// save corpus (its fully-unlocked value). Confirmed for Europe by a forward
-/// unlock-everything test on hardware (see `docs/save-format.md`).
+/// These cover the **unlock-accumulator** bits of the `0x1AD70`–`0x1ADB0` region
+/// (the bits that strictly accumulate across a playthrough). The masks are
+/// **bit-precise**: where a byte mixes accumulator bits with volatile current-state
+/// bits, only the accumulator bits are included, so OR-ing a mask sets unlock bits
+/// while leaving the byte's volatile bits as the save's own. OR-ing can only set
+/// bits, never clear them. Each mask is the union of that byte's monotone bits
+/// across the save corpus (its fully-unlocked value). Confirmed for Europe by a
+/// forward unlock-everything test on hardware, including the previously-missed
+/// `0x1AD71` bit 6 (the Sandy Paradise gate that opens the fifth bonus minigame and
+/// Kibapon production), see `docs/save-format.md`.
 pub fn unlock_all_masks(region: Region) -> Option<&'static [(usize, u8)]> {
     match region {
         Region::Europe => Some(&EU_UNLOCK_ALL_MASKS),
@@ -162,12 +165,14 @@ pub fn unlock_all_masks(region: Region) -> Option<&'static [(usize, u8)]> {
 }
 
 #[rustfmt::skip]
-const EU_UNLOCK_ALL_MASKS: [(usize, u8); 28] = [
-    (0x1AD72, 0x3F), (0x1AD73, 0xF0), (0x1AD74, 0x1D), (0x1AD77, 0xFF),
-    (0x1AD78, 0xFF), (0x1AD79, 0xFF), (0x1AD7A, 0xFF), (0x1AD7B, 0xFF),
-    (0x1AD7C, 0xFF), (0x1AD7D, 0x3F), (0x1AD86, 0xB7), (0x1AD87, 0xED),
-    (0x1AD8B, 0xDB), (0x1AD8C, 0xB6), (0x1AD8D, 0x6D), (0x1AD8E, 0x03),
-    (0x1AD94, 0x80), (0x1AD95, 0xFF), (0x1AD96, 0x07), (0x1AD98, 0xE0),
-    (0x1AD99, 0xFF), (0x1AD9A, 0xFF), (0x1AD9B, 0xFF), (0x1AD9C, 0x80),
-    (0x1AD9D, 0x0F), (0x1AD9F, 0xCF), (0x1ADA0, 0xF5), (0x1ADA1, 0x01),
+const EU_UNLOCK_ALL_MASKS: [(usize, u8); 35] = [
+    (0x1AD71, 0xF0), (0x1AD72, 0x3F), (0x1AD73, 0xF0), (0x1AD74, 0x1D),
+    (0x1AD76, 0xFE), (0x1AD77, 0xFF), (0x1AD78, 0xFF), (0x1AD79, 0xFF),
+    (0x1AD7A, 0xFF), (0x1AD7B, 0xFF), (0x1AD7C, 0xFF), (0x1AD7D, 0x3F),
+    (0x1AD84, 0x40), (0x1AD85, 0xD0), (0x1AD86, 0xB7), (0x1AD87, 0xED),
+    (0x1AD88, 0xDF), (0x1AD89, 0xB6), (0x1AD8A, 0x6D), (0x1AD8B, 0xDB),
+    (0x1AD8C, 0xB6), (0x1AD8D, 0x6D), (0x1AD8E, 0x03), (0x1AD94, 0x80),
+    (0x1AD95, 0xFF), (0x1AD96, 0x07), (0x1AD98, 0xE0), (0x1AD99, 0xFF),
+    (0x1AD9A, 0xFF), (0x1AD9B, 0xFF), (0x1AD9C, 0x80), (0x1AD9D, 0x0F),
+    (0x1AD9F, 0xCF), (0x1ADA0, 0xF5), (0x1ADA1, 0x01),
 ];
