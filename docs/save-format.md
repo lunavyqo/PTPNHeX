@@ -480,23 +480,33 @@ inventory, so the quest items merely set these same bits), with nothing visibly
 desynced. So drum availability, unit-building, mission/boss availability, and most
 minigames are all gated here, not by separate per-feature flags.
 
-Classifying every byte by whether its bits are strictly accumulating across the
-chronological corpus separates the genuine unlock bits from volatile state that
-happens to sit in the same span:
+Classifying every **bit** by whether it strictly accumulates across the
+chronological corpus (set once, never cleared) separates the genuine unlock bits
+from volatile state. Several bytes are *mixed* — they hold accumulator bits next to
+volatile ones — so the classification is bit-precise, not byte-granular:
 
-| Bytes | Kind |
+| Region | Accumulator (unlock) bits |
 | --- | --- |
-| `0x1AD72`–`74`, `0x1AD77`–`7D`, `0x1AD86`–`87`, `0x1AD8B`–`8E`, `0x1AD94`–`9D`, `0x1AD9F`–`A1` | **Unlock accumulators** — bits only ever set, never cleared; the real unlock table |
-| `0x1AD71`, `0x1AD84`–`85`, `0x1AD88`–`8A`, `0x1AD9E`, `0x1ADAF` | Volatile current-state — bits clear from save to save |
-| remainder | Constant `0x00` padding |
+| `0x1AD71` | `0xF0` (`0x01` is volatile) |
+| `0x1AD72`–`74` | `0x3F`, `0xF0`, `0x1D` |
+| `0x1AD76`–`7D` | `0xFE`, then `0xFF` ×6, `0x3F` |
+| `0x1AD84`–`85` | `0x40` (`0x80` volatile), `0xD0` (`0x04` volatile) |
+| `0x1AD86`–`8E` | `0xB7`, `0xED`, `0xDF` (`0x20` vol.), `0xB6` (`0x08` vol.), `0x6D` (`0x10` vol.), `0xDB`, `0xB6`, `0x6D`, `0x03` |
+| `0x1AD94`–`A1` | `0x80`, `0xFF`, `0x07`, `0xE0`, `0xFF`, `0xFF`, `0xFF`, `0x80`, `0x0F`, `0xCF`, `0xF5`, `0x01` |
 
-Only the accumulator bytes should be copied to "unlock everything"; the volatile
-bytes are left as the target save's own to avoid desyncing its current state. The
-mechanism was confirmed both directions on hardware — clearing a save's Chaka
-unlock bits (`0x1AD78`/`0x1AD87`, both accumulator bytes) **disabled** the drum in
-a mission (the token still showed), and writing the captured "learned" bits onto a
-save that never had Chaka **enabled** it. Nearby, a separate `u32` array at
-`0x1A630+` holds per-category play counts (not unlock flags).
+The remaining bits (`0x1AD9E`, `0x1ADAF`–`BF`, and the unlisted bits above) are
+volatile current-state or `0x00` padding. To "unlock everything" only the
+accumulator bits are OR-ed in, leaving each byte's volatile bits as the target
+save's own so its current state is not disturbed. The mechanism was confirmed both
+directions on hardware — clearing a save's Chaka unlock bits (`0x1AD78`/`0x1AD87`)
+**disabled** the drum in a mission (the token still showed), and writing the
+captured "learned" bits onto a save that never had Chaka **enabled** it. Nearby, a
+separate `u32` array at `0x1A630+` holds per-category play counts (not unlock
+flags).
+
+An earlier pass mistook the mixed bytes (`0x1AD71`, `0x1AD84`–`85`, `0x1AD88`–`8A`)
+for purely volatile and excluded them wholesale, which silently dropped real unlock
+bits — see *The bonus Patapons* below.
 
 ### The mission-prep loadout slots (`0x1A0F0`)
 
@@ -508,11 +518,33 @@ only this bit restores both); with the slots open, which miracles are castable
 then follows from the miracle tokens in the inventory. The flag first sets early in
 the story (around the fifth mission) and persists thereafter.
 
-Not yet decoded: the meaning of each *individual* unlock bit (which bit opens which
-specific mission/command). One feature is known **not** to live here — the mountain
-minigame stays locked even with the whole unlock region and every nearby persistent
-flag set, so it appears to be gated by volatile current chapter/map state rather
-than a permanent unlock bit.
+Not yet fully decoded: the meaning of each *individual* unlock bit (which bit opens
+which specific mission/command).
+
+### The bonus Patapons (revive and minigame unlocks)
+
+Patapolis can revive five bonus Patapons (Pakapon, Kimpon, Zakapon, Kampon,
+Gashpon) by burying a cap dropped in a mission; each grants a minigame. Their state
+lives in the unlock bitfields as **two parallel bit sets**:
+
+- **Revive / unlock flags** clustered around `0x1AD71`. Reviving a bonus Patapon
+  sets one bit here, which is what unlocks that Patapon's minigame (and, for
+  Kimpon's story beat, the **Kibapon** unit class — so this region is also the gate
+  behind some *buildable-unit* unlocks, separate from owning the unit Memory item).
+  Confirmed on hardware: a before/after capture across the revive ceremony isolated
+  **`0x1AD71` bit 6**, and a forward test (setting only that bit on a pre-revive
+  save) made both the minigame and Kibapon production available without the
+  ceremony.
+- **Dialog-seen flags** in the `0x1AD9C`/`0x1AD9D` cluster — each bonus Patapon's
+  one-time introduction dialog. Clearing `0x1AD9D` bit 0 on a save where Kimpon had
+  been met replayed his first-interaction dialog **without** removing the minigame,
+  showing this bit only tracks "has been talked to," not the unlock.
+
+Because `0x1AD71` was earlier misclassified as a purely volatile byte, the
+"unlock everything" copy skipped it, leaving the fifth minigame and the
+`0x1AD71`-gated unit classes locked. The bit-precise mask above includes it, and
+the completed copy was hardware-verified to grant all five minigames and every unit
+class with no desync.
 
 ## How fields are confirmed
 

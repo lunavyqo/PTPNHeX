@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- Documented the **bonus-Patapon** unlocks in `docs/save-format.md`: the revive/
+  unlock flags clustered around `0x1AD71` (with `0x1AD71` bit 6, the Sandy Paradise
+  gate, hardware-confirmed to open the fifth minigame and Kibapon production) and
+  the separate dialog-seen flags in the `0x1AD9C`/`0x1AD9D` cluster. Replaced the
+  byte-granular accumulator/volatile classification with a **bit-precise** one (the
+  mixed bytes `0x1AD71`, `0x1AD84`–`85`, `0x1AD88`–`8A` hold real unlock bits next
+  to volatile ones), and corrected the earlier claim that the mountain minigame was
+  not a permanent unlock — it is `0x1AD71` bit 6, which a byte-granular pass had
+  wrongly excluded.
 - Completed the inventory map in `docs/save-format.md`: documented the two hidden
   categories — **Caps** (`0x19D34`–`0x19D48`, red background; the death cap plus
   five minigame-unlock caps) and **Trophies** (purple background; boss/enemy heads
