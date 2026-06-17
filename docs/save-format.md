@@ -373,9 +373,16 @@ the caps Patapons drop, normally never held in the inventory:
 | `0x19D44` | Kampon Cap | → Kampon + its minigame |
 | `0x19D48` | Gashpon Cap | → Gashpon + its minigame |
 
-`0x19D4C` and `0x19D50` are invalid (crash the altar when force-owned). Because
-these caps unlock the bonus minigames, they are a lead on the otherwise-separate
-minigame-unlock question.
+`0x19D4C` and `0x19D50` are invalid (crash the altar when force-owned).
+
+The "role" column describes what each cap is *in the game's fiction* (mission loot
+that becomes a bonus Patapon and its minigame); it does **not** describe the effect
+of the inventory flag. Force-owning a cap here only makes the item appear in the
+altar — it does **not** unlock the corresponding minigame. These caps are never
+meant to be held in the inventory at all (that they can be force-owned is the
+anomaly), so they are datamine artifacts, not a handle on the minigame-unlock
+question. The actual bonus-minigame unlocks live in the progress/story structure,
+not in this inventory flag.
 
 ### Trophies, the special items, and the end of the table
 
