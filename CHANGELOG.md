@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- Mapped the full **bonus-Patapon revive table** in `docs/save-format.md`: all five
+  Patapons as a contiguous run of bit-pairs (`0x1AD71` bits 4,5 Pakapon; bits 6,7
+  Kimpon; `0x1AD72` bits 0,1 Fah Zakpon; bits 2,3 Rah Gashapon; bits 4,5 Kampon),
+  found by using the cap **count** byte as a per-Patapon "revived" timing oracle and
+  confirmed on hardware (Kimpon by a forward single-bit test, Zakpon/Gashpon by
+  clearing each pair on a complete save).
 - Documented the **bonus-Patapon** unlocks in `docs/save-format.md`: the revive/
   unlock flags clustered around `0x1AD71` (with `0x1AD71` bit 6, the Sandy Paradise
   gate, hardware-confirmed to open the fifth minigame and Kibapon production) and

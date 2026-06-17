@@ -527,14 +527,32 @@ Patapolis can revive five bonus Patapons (Pakapon, Kimpon, Zakapon, Kampon,
 Gashpon) by burying a cap dropped in a mission; each grants a minigame. Their state
 lives in the unlock bitfields as **two parallel bit sets**:
 
-- **Revive / unlock flags** clustered around `0x1AD71`. Reviving a bonus Patapon
-  sets one bit here, which is what unlocks that Patapon's minigame (and, for
-  Kimpon's story beat, the **Kibapon** unit class — so this region is also the gate
-  behind some *buildable-unit* unlocks, separate from owning the unit Memory item).
-  Confirmed on hardware: a before/after capture across the revive ceremony isolated
-  **`0x1AD71` bit 6**, and a forward test (setting only that bit on a pre-revive
-  save) made both the minigame and Kibapon production available without the
-  ceremony.
+- **Revive / unlock flags** — a contiguous table of five **bit-pairs** spanning
+  `0x1AD71` bit 4 through `0x1AD72` bit 5, one pair per Patapon, ordered by revive
+  order. The pair's two bits always flip together; setting the low (even) bit alone
+  reproduces the full effect (hardware-tested for Kimpon), so it is the primary
+  unlock and the high bit a co-flag. The ten bits exactly fill the `0x1AD71` `0xF0`
+  + `0x1AD72` `0x3F` accumulator masks, and `0x1AD72` bits 6–7 are never set (there
+  are exactly five Patapons).
+
+  | Patapon | Revive bits | Notes |
+  | --- | --- | --- |
+  | Pakapon | `0x1AD71` bits 4,5 | revived earliest |
+  | Kimpon | `0x1AD71` bits 6,7 | the mountain minigame; also unlocks **Kibapon** production |
+  | Fah Zakpon | `0x1AD72` bits 0,1 | "Pop Bean the Legume" minigame |
+  | Rah Gashapon | `0x1AD72` bits 2,3 | "Simmer Slurp the Cooking Pot" minigame |
+  | Kampon | `0x1AD72` bits 4,5 | revived last |
+
+  These were mapped offline against the chronological save corpus and confirmed on
+  hardware. The decisive timing signal is the **cap count byte** (`@+0` of each cap
+  inventory record at `0x19D38`/`0x19D3C`/`0x19D40`/`0x19D44`/`0x19D48`): it flips
+  `0→1` when that Patapon is revived and persists, while the cap's *owned* flag stays
+  `0` — a per-Patapon "revived" marker that dates each revive exactly. Kimpon's pair
+  was proven directly: setting only `0x1AD71` bit 6 on a pre-revive save made both
+  his minigame and Kibapon production appear; the Zakpon/Gashpon pairs were confirmed
+  by clearing each on a complete save and observing which minigame disappeared. Note
+  this region also gates some **buildable-unit** unlocks (Kibapon rides on Kimpon's
+  pair), separate from owning the unit Memory item.
 - **Dialog-seen flags** in the `0x1AD9C`/`0x1AD9D` cluster — each bonus Patapon's
   one-time introduction dialog. Clearing `0x1AD9D` bit 0 on a save where Kimpon had
   been met replayed his first-interaction dialog **without** removing the minigame,
