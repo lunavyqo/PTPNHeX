@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- Completed the inventory map in `docs/save-format.md`: documented the two hidden
+  categories — **Caps** (`0x19D34`–`0x19D48`, red background; the death cap plus
+  five minigame-unlock caps) and **Trophies** (purple background; boss/enemy heads
+  and Meden) — the gap items (Iron Shield/Bow, Fast Horse, Ancient Horn, Gong's
+  Helm), the special items (Spear of Protection, the hack-only Late Tatepon/Yumipon
+  weapons), a developer-placeholder weapon family (one Divine-model per category,
+  −1 HP), the unwearable helm placeholders, the "(delete)" removed-content helms,
+  and the table's true extent (null padding after `0x19FE8`). Corrected the earlier
+  "the slots after the key items freeze the altar" note: only two of those eight
+  (`0x19D4C`, `0x19D50`) are invalid; the other six are the Cap category.
 - Documented the per-unit **rarepon** field in `docs/save-format.md`: the `u32`
   at record offset `+0x48` holds the rarepon id (a 32-bit name-hash) that sets a
   unit's body/appearance, with a table of the confirmed body codes (Barsala,

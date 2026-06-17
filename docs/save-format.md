@@ -353,15 +353,73 @@ miracle/stew slots exist at all — live in a separate **story/progress structur
 the same kind of gate: owned ≠ buildable). The miracle-*summon* command itself has
 no scroll among these 19 and is purely story-gated.
 
-The records that follow these 19 (up to `0x19D54`, where the materials begin) are
-never-owned/unused; forcing them owned **freezes the altar**, so the editor
-exposes only the 19 valid tokens.
+The eight records that follow these 19 (`0x19D34`–`0x19D50`, up to `0x19D54` where
+the materials begin) split into **six real items and two invalid slots** (see
+*Caps* below): force-owning the two invalid ones (`0x19D4C`, `0x19D50`) crashes the
+altar, which is why the editor exposes only valid tokens.
 
-### Not yet decoded
+### Caps (`0x19D34`–`0x19D48`)
 
-The records *after* the last item (`0x19FD4..0x1A0E0`) are mostly empty/unused,
-but a few are real (some weapons and a key item, "Meden's Trophy"); they have not
-all been named.
+The six records between the key items and the materials are a hidden **"Cap"**
+category (a **red** slot background, distinct from the Trophies' purple). They are
+the caps Patapons drop, normally never held in the inventory:
+
+| offset | item | role |
+| --- | --- | --- |
+| `0x19D34` | Cap | the death/revival cap (dropped on death, buried in Patapolis) |
+| `0x19D38` | Pakapon's Cap | mission loot → becomes Pakapon → unlocks the tree minigame |
+| `0x19D3C` | Kimpon Cap | → Kimpon + its minigame |
+| `0x19D40` | Zakapon Cap | → Zakapon + its minigame |
+| `0x19D44` | Kampon Cap | → Kampon + its minigame |
+| `0x19D48` | Gashpon Cap | → Gashpon + its minigame |
+
+`0x19D4C` and `0x19D50` are invalid (crash the altar when force-owned). Because
+these caps unlock the bonus minigames, they are a lead on the otherwise-separate
+minigame-unlock question.
+
+### Trophies, the special items, and the end of the table
+
+Scattered among the never-obtained slots between the materials and the table's end
+are a second hidden category and a family of special/unused items, all confirmed by
+force-owning each slot and reading it in-game. Their exact stats will be sourced
+from the community wiki rather than measured slot by slot.
+
+- **Trophies** — a hidden category with a **purple** background and "(no
+  translation needed)" descriptions, normally unobtainable. It holds the boss/enemy
+  trophies (`0x19DD0`–`0x19E24`: *Head of Dodonga/Majidonga/Zaknel/Dokaknel/Gaeen/
+  Dogaeen*, *Ciokina's/Cioking's Pincer*, *Head of Shookle/Shooshokle/Gorl/Motiti/
+  Momoti/Motsitsi*, and the "-cheek" creatures *Kacheek/Picheek/Parcheek/Poocheek/
+  Gancheek* plus terrain *Kacheek* variants) and, separately, **Meden** at
+  `0x19FE8`. The category is not offset-contiguous.
+- **Real items in the gaps** (just never obtained in the corpus): **Iron Shield**
+  (`0x19E7C`, the 8th shield, between Wood and Steel), **Iron Bow** (`0x19EA4`),
+  **Fast Horse** (`0x19EF4`), **Ancient Horn** (`0x19F58`), **Gong's Helm**
+  (`0x19FA4`).
+- **Legitimate but special:** **Spear of Protection** (`0x19E48`) — a real item
+  with a real description, obtainable by loading Patapon 1 demo save data.
+- **Hack-only weapons** (used by the tutorial bosses, name text partly coloured):
+  **Sword of the Late Tatepon** (`0x19E74`) and **Bow of the Late Yumipon**
+  (`0x19EC0`).
+- **A developer-placeholder weapon family** — one per category, each with a "(no
+  translation needed)" name, the **Divine model** of its category, and a single
+  stat effect of **−1 HP**: bow (`0x19EC4`), spear (`0x19E4C`), halberds
+  (`0x19EE8`, `0x19EEC`), hammers (`0x19F38`, `0x19F3C`, Divine *Axe* model), and
+  horns (`0x19F60`, `0x19F64`). Two anomalies: the placeholder **horses** (`0x19F10`,
+  `0x19F14`) have a unique custom model (not borrowed), and the placeholder
+  **horns** render misplaced (the model floats up-and-right). The two placeholder
+  **shields** (`0x19E98`, `0x19E9C`) share the −1 HP signature with the textures
+  `仮` and a white dot-circle.
+- **Unwearable helms** — `0x19F8C`–`0x19FA0` and `0x19FA8`–`0x19FC4` (14 slots) are
+  helm-icon placeholders that cannot be equipped.
+- **Removed items** — `0x19FD4`–`0x19FE4` are five **"(delete)"** helms (a distinct
+  placeholder string for removed content).
+- **End of the table** — after `0x19FE8` (Meden), the slots `0x19FEC`–`0x1A0DC` are
+  **null padding**: force-owning them has no effect (they render as empty cells), so
+  the item table effectively ends there.
+
+Three placeholder-string classes distinguish the slot kinds: **"(no translation
+needed)"** = present but unlocalized (unused/dev/hack), **"(delete)"** = removed
+item, and an altar **crash** = an invalid slot.
 
 ### A note on the in-game display
 
