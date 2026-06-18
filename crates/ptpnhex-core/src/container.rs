@@ -328,6 +328,47 @@ impl SaveSlot {
         (off < self.data.len()).then_some((off, mask))
     }
 
+    /// Whether `bonus_patapon`'s one-time introduction dialog has been seen.
+    pub fn bonus_patapon_dialog_seen(&self, bonus_patapon: crate::save::BonusPatapon) -> bool {
+        self.bonus_patapon_dialog_flag(bonus_patapon)
+            .is_some_and(|(off, mask)| self.data[off] & mask == mask)
+    }
+
+    /// Marks `bonus_patapon`'s introduction dialog as seen or unseen. Clearing it
+    /// (`seen = false`) makes the one-time intro **replay** on the next interaction;
+    /// this is cosmetic and does not affect the revive/minigame (see
+    /// [`set_bonus_patapon`](Self::set_bonus_patapon)).
+    pub fn set_bonus_patapon_dialog_seen(
+        &mut self,
+        bonus_patapon: crate::save::BonusPatapon,
+        seen: bool,
+    ) -> Result<()> {
+        let (off, mask) = self
+            .bonus_patapon_dialog_flag(bonus_patapon)
+            .ok_or_else(|| {
+                Error::Unsupported(format!(
+                    "bonus Patapons are not mapped for {}",
+                    self.region.serial()
+                ))
+            })?;
+        if seen {
+            self.data[off] |= mask;
+        } else {
+            self.data[off] &= !mask;
+        }
+        Ok(())
+    }
+
+    /// The `(offset, mask)` of a bonus Patapon's dialog-seen flag, if mapped.
+    fn bonus_patapon_dialog_flag(
+        &self,
+        bonus_patapon: crate::save::BonusPatapon,
+    ) -> Option<(usize, u8)> {
+        let flags = crate::save::layout::bonus_patapon_dialog_flags(self.region)?;
+        let (off, mask) = flags[bonus_patapon.position()];
+        (off < self.data.len()).then_some((off, mask))
+    }
+
     /// The offset of the loadout-slots flag, if mapped and in bounds.
     fn loadout_slots_offset(&self) -> Option<usize> {
         let off = crate::save::layout::loadout_slots_offset(self.region)?;

@@ -63,6 +63,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Bonus-Patapon intro-dialog editing: `SaveSlot::bonus_patapon_dialog_seen` /
+  `set_bonus_patapon_dialog_seen` read and toggle each bonus Patapon's one-time
+  introduction-dialog "seen" flag (clearing it replays the intro on the next
+  interaction; cosmetic, separate from the revive/minigame), backed by the
+  region-aware table in `layout::bonus_patapon_dialog_flags`. The five flags
+  (`0x1AD9C` bit 7 Pakapon; `0x1AD9D` bits 0–3 Kimpon/Zakpon/Gashpon/Kampon) were
+  hardware-confirmed. Exposed on the CLI as `set-dialog-seen <slug|all> <on|off>`,
+  and the `bonus-patapons` listing now shows each Patapon's intro-seen status.
 - Bonus-Patapon editing: `SaveSlot::bonus_patapon` / `bonus_patapons` /
   `set_bonus_patapon` revive or remove each of the five Patapolis bonus Patapons
   (Pakapon, Kimpon, Fah Zakpon, Rah Gashapon, Kampon) by toggling its unlock

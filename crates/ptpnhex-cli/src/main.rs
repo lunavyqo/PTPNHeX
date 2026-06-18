@@ -149,6 +149,20 @@ enum Command {
         #[arg(long, value_name = "DIR")]
         backup_dir: Option<PathBuf>,
     },
+    /// Mark a bonus Patapon's one-time intro dialog as seen, or clear it so the
+    /// intro replays on the next interaction (cosmetic; does not affect the revive).
+    SetDialogSeen {
+        /// Path to the save directory.
+        dir: PathBuf,
+        /// Bonus-Patapon slug (for example `kimpon`), or `all`.
+        patapon: String,
+        /// `on` = seen (intro will not play), `off` = unseen (intro replays).
+        state: String,
+        /// Copy the original files into this directory before saving.
+        /// Must be outside the save directory.
+        #[arg(long, value_name = "DIR")]
+        backup_dir: Option<PathBuf>,
+    },
     /// Set the save's title — the bold line shown in the PSP save list.
     SetTitle {
         /// Path to the save directory.
@@ -225,6 +239,12 @@ fn main() -> Result<()> {
             state,
             backup_dir,
         } => set_bonus_patapon(&dir, &patapon, &state, backup_dir.as_deref()),
+        Command::SetDialogSeen {
+            dir,
+            patapon,
+            state,
+            backup_dir,
+        } => set_dialog_seen(&dir, &patapon, &state, backup_dir.as_deref()),
         Command::SetTitle {
             dir,
             title,
@@ -495,14 +515,20 @@ fn unlock_all(dir: &Path, backup_dir: Option<&Path>) -> Result<()> {
     Ok(())
 }
 
-/// Lists the bonus Patapons and whether each is revived.
+/// Lists the bonus Patapons, whether each is revived (`[x]`), and whether its
+/// one-time intro dialog has been seen.
 fn bonus_patapons(dir: &Path) -> Result<()> {
     let slot = open(dir)?;
     for (bp, revived) in slot.bonus_patapons() {
         let mark = if revived { "x" } else { " " };
+        let intro = if slot.bonus_patapon_dialog_seen(bp) {
+            "intro seen"
+        } else {
+            "intro unseen"
+        };
         match bp.minigame() {
-            Some(minigame) => println!("  [{mark}] {} ({minigame})", bp.name()),
-            None => println!("  [{mark}] {}", bp.name()),
+            Some(minigame) => println!("  [{mark}] {} ({minigame}) - {intro}", bp.name()),
+            None => println!("  [{mark}] {} - {intro}", bp.name()),
         }
     }
     Ok(())
@@ -533,6 +559,37 @@ fn set_bonus_patapon(
 
     back_up_and_save(&slot, backup_dir)?;
     println!("{edited}: {}", if revived { "revived" } else { "removed" });
+    Ok(())
+}
+
+/// Marks a bonus Patapon's intro dialog as seen, or clears it so the intro replays.
+fn set_dialog_seen(
+    dir: &Path,
+    patapon: &str,
+    state: &str,
+    backup_dir: Option<&Path>,
+) -> Result<()> {
+    let seen = parse_state(state)?;
+    let mut slot = open(dir)?;
+
+    let edited = if patapon == "all" {
+        for bp in BonusPatapon::all() {
+            slot.set_bonus_patapon_dialog_seen(bp, seen)?;
+        }
+        format!("{} bonus Patapons", BonusPatapon::all().count())
+    } else {
+        let bp = BonusPatapon::from_slug(patapon).with_context(|| {
+            format!("unknown bonus Patapon `{patapon}` (try `bonus-patapons` to list)")
+        })?;
+        slot.set_bonus_patapon_dialog_seen(bp, seen)?;
+        bp.name().to_string()
+    };
+
+    back_up_and_save(&slot, backup_dir)?;
+    println!(
+        "{edited}: intro {}",
+        if seen { "marked seen" } else { "will replay" }
+    );
     Ok(())
 }
 

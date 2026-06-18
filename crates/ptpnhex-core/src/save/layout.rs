@@ -169,6 +169,32 @@ const EU_BONUS_PATAPON_FLAGS: [(usize, u8); 5] = [
     (0x1AD72, 0x30), // Kampon       — 0x1AD72 bits 4,5
 ];
 
+/// `(offset, bit mask)` for each bonus Patapon's **first-interaction dialog-seen**
+/// flag for `region`, paired index-for-index with [`crate::save::bonus_patapon`].
+///
+/// Each bonus Patapon has a one-time introduction dialog the first time you talk
+/// to it in Patapolis; this single bit records that it has been seen. Clearing it
+/// makes the intro **replay** on the next interaction; it is cosmetic and separate
+/// from the revive/minigame flags in [`bonus_patapon_flags`]. The bits run in the
+/// same Patapon order as the revive pairs and were confirmed for Europe on hardware
+/// (clearing each one replayed exactly that Patapon's intro).
+pub fn bonus_patapon_dialog_flags(region: Region) -> Option<&'static [(usize, u8); 5]> {
+    match region {
+        Region::Europe => Some(&EU_BONUS_PATAPON_DIALOG_FLAGS),
+        Region::NorthAmerica | Region::Japan => None,
+    }
+}
+
+// Paired index-for-index with `bonus_patapon::DEFS` (revive order).
+#[rustfmt::skip]
+const EU_BONUS_PATAPON_DIALOG_FLAGS: [(usize, u8); 5] = [
+    (0x1AD9C, 0x80), // Pakapon      — 0x1AD9C bit 7
+    (0x1AD9D, 0x01), // Kimpon       — 0x1AD9D bit 0
+    (0x1AD9D, 0x02), // Fah Zakpon   — 0x1AD9D bit 1
+    (0x1AD9D, 0x04), // Rah Gashapon — 0x1AD9D bit 2
+    (0x1AD9D, 0x08), // Kampon       — 0x1AD9D bit 3
+];
+
 /// `(offset, OR-mask)` pairs that, applied to the save's unlock bitfields, set
 /// every confirmed unlock for `region` — all drums, every buildable unit type,
 /// the full mission list, and all boss missions.

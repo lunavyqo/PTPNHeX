@@ -541,6 +541,46 @@ fn bonus_patapons_match_corpus_and_toggle() {
 }
 
 #[test]
+fn bonus_patapon_dialog_seen_matches_corpus_and_toggles() {
+    // A complete save (DATA46) has every intro dialog seen; an early save (DATA04)
+    // has only the earliest Patapon's (Pakapon, talked to ~0:48) — Kampon's, seen
+    // last (~48:18), is unseen. The setter both marks seen and clears (replay).
+    use ptpnhex_core::save::BonusPatapon;
+    let Some(dir) = saves_dir() else {
+        eprintln!("skipped: set PTPNHEX_SAVES_DIR");
+        return;
+    };
+    let mut late = SaveSlot::open(dir.join("UCES00995_DATA46"), &KeyProvider::Embedded).unwrap();
+    for bp in BonusPatapon::all() {
+        assert!(
+            late.bonus_patapon_dialog_seen(bp),
+            "DATA46 should have {}'s intro seen",
+            bp.name()
+        );
+    }
+
+    let kimpon = BonusPatapon::from_slug("kimpon").unwrap();
+    late.set_bonus_patapon_dialog_seen(kimpon, false).unwrap();
+    assert!(
+        !late.bonus_patapon_dialog_seen(kimpon),
+        "clearing should mark the intro unseen"
+    );
+    late.set_bonus_patapon_dialog_seen(kimpon, true).unwrap();
+    assert!(
+        late.bonus_patapon_dialog_seen(kimpon),
+        "setting should mark the intro seen"
+    );
+
+    let early = SaveSlot::open(dir.join("UCES00995_DATA04"), &KeyProvider::Embedded).unwrap();
+    let kampon = BonusPatapon::from_slug("kampon").unwrap();
+    assert!(
+        !early.bonus_patapon_dialog_seen(kampon),
+        "DATA04 (early) should not have Kampon's intro seen"
+    );
+    eprintln!("bonus Patapon dialog-seen flags match the corpus and toggle");
+}
+
+#[test]
 fn army_roster_reads_and_rarepon_round_trips() {
     // Reads the roster of a progressed save, checks every unit has a known class
     // and rarepon code, and round-trips set_unit_rarepon on a working copy (no
