@@ -369,6 +369,46 @@ impl SaveSlot {
         (off < self.data.len()).then_some((off, mask))
     }
 
+    /// Whether `bonus_patapon`'s minigame has been played at least once.
+    pub fn bonus_patapon_minigame_played(&self, bonus_patapon: crate::save::BonusPatapon) -> bool {
+        self.bonus_patapon_played_flag(bonus_patapon)
+            .is_some_and(|(off, mask)| self.data[off] & mask == mask)
+    }
+
+    /// Marks `bonus_patapon`'s minigame as played or never-played. Cosmetic; it
+    /// does not affect the revive/minigame availability (see
+    /// [`set_bonus_patapon`](Self::set_bonus_patapon)).
+    pub fn set_bonus_patapon_minigame_played(
+        &mut self,
+        bonus_patapon: crate::save::BonusPatapon,
+        played: bool,
+    ) -> Result<()> {
+        let (off, mask) = self
+            .bonus_patapon_played_flag(bonus_patapon)
+            .ok_or_else(|| {
+                Error::Unsupported(format!(
+                    "bonus Patapons are not mapped for {}",
+                    self.region.serial()
+                ))
+            })?;
+        if played {
+            self.data[off] |= mask;
+        } else {
+            self.data[off] &= !mask;
+        }
+        Ok(())
+    }
+
+    /// The `(offset, mask)` of a bonus Patapon's minigame-played flag, if mapped.
+    fn bonus_patapon_played_flag(
+        &self,
+        bonus_patapon: crate::save::BonusPatapon,
+    ) -> Option<(usize, u8)> {
+        let flags = crate::save::layout::bonus_patapon_played_flags(self.region)?;
+        let (off, mask) = flags[bonus_patapon.position()];
+        (off < self.data.len()).then_some((off, mask))
+    }
+
     /// The offset of the loadout-slots flag, if mapped and in bounds.
     fn loadout_slots_offset(&self) -> Option<usize> {
         let off = crate::save::layout::loadout_slots_offset(self.region)?;

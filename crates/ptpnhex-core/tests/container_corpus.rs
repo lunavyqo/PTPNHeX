@@ -581,6 +581,42 @@ fn bonus_patapon_dialog_seen_matches_corpus_and_toggles() {
 }
 
 #[test]
+fn bonus_patapon_minigame_played_matches_corpus_and_toggles() {
+    // A complete save (DATA46) has every minigame played; the earliest save
+    // (DATA04, 0:17) has none. The setter both marks played and clears.
+    use ptpnhex_core::save::BonusPatapon;
+    let Some(dir) = saves_dir() else {
+        eprintln!("skipped: set PTPNHEX_SAVES_DIR");
+        return;
+    };
+    let mut late = SaveSlot::open(dir.join("UCES00995_DATA46"), &KeyProvider::Embedded).unwrap();
+    for bp in BonusPatapon::all() {
+        assert!(
+            late.bonus_patapon_minigame_played(bp),
+            "DATA46 should have {}'s minigame played",
+            bp.name()
+        );
+    }
+    let kimpon = BonusPatapon::from_slug("kimpon").unwrap();
+    late.set_bonus_patapon_minigame_played(kimpon, false)
+        .unwrap();
+    assert!(!late.bonus_patapon_minigame_played(kimpon));
+    late.set_bonus_patapon_minigame_played(kimpon, true)
+        .unwrap();
+    assert!(late.bonus_patapon_minigame_played(kimpon));
+
+    let early = SaveSlot::open(dir.join("UCES00995_DATA04"), &KeyProvider::Embedded).unwrap();
+    for bp in BonusPatapon::all() {
+        assert!(
+            !early.bonus_patapon_minigame_played(bp),
+            "DATA04 (earliest) should have no minigame played, but {} reads played",
+            bp.name()
+        );
+    }
+    eprintln!("bonus Patapon minigame-played flags match the corpus and toggle");
+}
+
+#[test]
 fn army_roster_reads_and_rarepon_round_trips() {
     // Reads the roster of a progressed save, checks every unit has a known class
     // and rarepon code, and round-trips set_unit_rarepon on a working copy (no

@@ -163,6 +163,20 @@ enum Command {
         #[arg(long, value_name = "DIR")]
         backup_dir: Option<PathBuf>,
     },
+    /// Mark a bonus Patapon's minigame as played or never-played (cosmetic; does
+    /// not affect the revive or minigame availability).
+    SetMinigamePlayed {
+        /// Path to the save directory.
+        dir: PathBuf,
+        /// Bonus-Patapon slug (for example `kimpon`), or `all`.
+        patapon: String,
+        /// `on` = played, `off` = never played.
+        state: String,
+        /// Copy the original files into this directory before saving.
+        /// Must be outside the save directory.
+        #[arg(long, value_name = "DIR")]
+        backup_dir: Option<PathBuf>,
+    },
     /// Set the save's title — the bold line shown in the PSP save list.
     SetTitle {
         /// Path to the save directory.
@@ -245,6 +259,12 @@ fn main() -> Result<()> {
             state,
             backup_dir,
         } => set_dialog_seen(&dir, &patapon, &state, backup_dir.as_deref()),
+        Command::SetMinigamePlayed {
+            dir,
+            patapon,
+            state,
+            backup_dir,
+        } => set_minigame_played(&dir, &patapon, &state, backup_dir.as_deref()),
         Command::SetTitle {
             dir,
             title,
@@ -526,9 +546,16 @@ fn bonus_patapons(dir: &Path) -> Result<()> {
         } else {
             "intro unseen"
         };
+        let played = if slot.bonus_patapon_minigame_played(bp) {
+            "minigame played"
+        } else {
+            "minigame unplayed"
+        };
         match bp.minigame() {
-            Some(minigame) => println!("  [{mark}] {} ({minigame}) - {intro}", bp.name()),
-            None => println!("  [{mark}] {} - {intro}", bp.name()),
+            Some(minigame) => {
+                println!("  [{mark}] {} ({minigame}) - {intro}, {played}", bp.name())
+            }
+            None => println!("  [{mark}] {} - {intro}, {played}", bp.name()),
         }
     }
     Ok(())
@@ -589,6 +616,41 @@ fn set_dialog_seen(
     println!(
         "{edited}: intro {}",
         if seen { "marked seen" } else { "will replay" }
+    );
+    Ok(())
+}
+
+/// Marks a bonus Patapon's minigame as played or never-played.
+fn set_minigame_played(
+    dir: &Path,
+    patapon: &str,
+    state: &str,
+    backup_dir: Option<&Path>,
+) -> Result<()> {
+    let played = parse_state(state)?;
+    let mut slot = open(dir)?;
+
+    let edited = if patapon == "all" {
+        for bp in BonusPatapon::all() {
+            slot.set_bonus_patapon_minigame_played(bp, played)?;
+        }
+        format!("{} bonus Patapons", BonusPatapon::all().count())
+    } else {
+        let bp = BonusPatapon::from_slug(patapon).with_context(|| {
+            format!("unknown bonus Patapon `{patapon}` (try `bonus-patapons` to list)")
+        })?;
+        slot.set_bonus_patapon_minigame_played(bp, played)?;
+        bp.name().to_string()
+    };
+
+    back_up_and_save(&slot, backup_dir)?;
+    println!(
+        "{edited}: minigame {}",
+        if played {
+            "marked played"
+        } else {
+            "marked unplayed"
+        }
     );
     Ok(())
 }

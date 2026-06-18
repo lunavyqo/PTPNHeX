@@ -68,6 +68,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Bonus-Patapon minigame-played editing: `SaveSlot::bonus_patapon_minigame_played` /
+  `set_bonus_patapon_minigame_played` read and toggle each bonus Patapon's
+  "minigame played at least once" flag, backed by the region-aware table in
+  `layout::bonus_patapon_played_flags`. The five flags span two bytes — `0x1AD9F`
+  bits 6–7 (Pakapon, Fah Zakpon) and `0x1ADA0` bits 0/4/5 (Rah Gashapon, Kimpon,
+  Kampon) — mapped by a controlled test (each minigame played once from an early
+  save where none had been). Exposed on the CLI as
+  `set-minigame-played <slug|all> <on|off>`, and the `bonus-patapons` listing now
+  shows each Patapon's minigame-played status. Cosmetic; does not affect minigame
+  availability.
 - Bonus-Patapon intro-dialog editing: `SaveSlot::bonus_patapon_dialog_seen` /
   `set_bonus_patapon_dialog_seen` read and toggle each bonus Patapon's one-time
   introduction-dialog "seen" flag (clearing it replays the intro on the next

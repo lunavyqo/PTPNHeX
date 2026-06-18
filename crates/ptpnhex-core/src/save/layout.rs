@@ -195,6 +195,32 @@ const EU_BONUS_PATAPON_DIALOG_FLAGS: [(usize, u8); 5] = [
     (0x1AD9D, 0x08), // Kampon       — 0x1AD9D bit 3
 ];
 
+/// `(offset, bit mask)` for each bonus Patapon's **minigame-played** flag for
+/// `region`, paired index-for-index with [`crate::save::bonus_patapon`].
+///
+/// Set the first time you play that Patapon's minigame; clearing it makes the
+/// game treat the minigame as never played. Cosmetic, separate from the revive
+/// and dialog flags. Mapped for Europe by a controlled test — from an early save
+/// where no minigame had been played, each minigame was played once and the bit
+/// it set recorded; note the five flags span **two** bytes (`0x1AD9F` and
+/// `0x1ADA0`), not one.
+pub fn bonus_patapon_played_flags(region: Region) -> Option<&'static [(usize, u8); 5]> {
+    match region {
+        Region::Europe => Some(&EU_BONUS_PATAPON_PLAYED_FLAGS),
+        Region::NorthAmerica | Region::Japan => None,
+    }
+}
+
+// Paired index-for-index with `bonus_patapon::DEFS` (revive order).
+#[rustfmt::skip]
+const EU_BONUS_PATAPON_PLAYED_FLAGS: [(usize, u8); 5] = [
+    (0x1AD9F, 0x40), // Pakapon      — 0x1AD9F bit 6
+    (0x1ADA0, 0x10), // Kimpon       — 0x1ADA0 bit 4
+    (0x1AD9F, 0x80), // Fah Zakpon   — 0x1AD9F bit 7
+    (0x1ADA0, 0x01), // Rah Gashapon — 0x1ADA0 bit 0
+    (0x1ADA0, 0x20), // Kampon       — 0x1ADA0 bit 5
+];
+
 /// `(offset, OR-mask)` pairs that, applied to the save's unlock bitfields, set
 /// every confirmed unlock for `region` — all drums, every buildable unit type,
 /// the full mission list, and all boss missions.
