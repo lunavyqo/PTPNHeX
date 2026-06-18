@@ -571,6 +571,24 @@ lives in the unlock bitfields as **two parallel bit sets**:
   a dialog bit must be a temporal subset of that Patapon's revive bits (you talk only
   after reviving); the data-locked Zakpon/Gashpon pair and the rest were confirmed on
   hardware by clearing each bit and seeing exactly that Patapon's intro replay.
+- **Minigame-played flags** — one bit per Patapon, set the first time its minigame is
+  played. Unlike the others these are **not** confined to a single byte — they span
+  `0x1AD9F` and `0x1ADA0`:
+
+  | Patapon | Minigame-played bit |
+  | --- | --- |
+  | Pakapon (tree) | `0x1AD9F` bit 6 |
+  | Fah Zakpon | `0x1AD9F` bit 7 |
+  | Rah Gashapon | `0x1ADA0` bit 0 |
+  | Kimpon (mountain) | `0x1ADA0` bit 4 |
+  | Kampon | `0x1ADA0` bit 5 |
+
+  Cosmetic (it does not affect minigame availability). Mapped by a controlled test:
+  from the earliest save (no minigame played), all five Patapons were revived with the
+  editor, each minigame played once, and the single bit each play set was read from a
+  whole-save diff — which is how the two `0x1AD9F` flags surfaced (clearing only
+  `0x1ADA0` would have missed them). Note minigames also consume a material as input,
+  and some grant an inventory item; both are ordinary inventory changes.
 
 Because `0x1AD71` was earlier misclassified as a purely volatile byte, the
 "unlock everything" copy skipped it, leaving the fifth minigame and the

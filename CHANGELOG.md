@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- Mapped the per-Patapon **minigame-played** bits in `docs/save-format.md`: the flag set
+  the first time each minigame is played, spanning two bytes (`0x1AD9F` bits 6–7 Pakapon,
+  Fah Zakpon; `0x1ADA0` bits 0/4/5 Rah Gashapon, Kimpon, Kampon), found by a controlled
+  whole-save diff from an early save. Also noted minigames consume a material and some
+  reward an item.
 - Mapped the per-Patapon **dialog-seen** bits in `docs/save-format.md`: the one-time
   introduction-dialog flags (`0x1AD9C` bit 7 Pakapon; `0x1AD9D` bits 0–3 Kimpon,
   Fah Zakpon, Rah Gashapon, Kampon), found via the cap-count timing oracle plus the
