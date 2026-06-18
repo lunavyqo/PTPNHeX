@@ -553,10 +553,24 @@ lives in the unlock bitfields as **two parallel bit sets**:
   by clearing each on a complete save and observing which minigame disappeared. Note
   this region also gates some **buildable-unit** unlocks (Kibapon rides on Kimpon's
   pair), separate from owning the unit Memory item.
-- **Dialog-seen flags** in the `0x1AD9C`/`0x1AD9D` cluster — each bonus Patapon's
-  one-time introduction dialog. Clearing `0x1AD9D` bit 0 on a save where Kimpon had
-  been met replayed his first-interaction dialog **without** removing the minigame,
-  showing this bit only tracks "has been talked to," not the unlock.
+- **Dialog-seen flags** — one bit per Patapon, recording that its one-time
+  introduction dialog has been seen. They run in the same Patapon order as the revive
+  pairs, across `0x1AD9C` bit 7 and `0x1AD9D` bits 0–3:
+
+  | Patapon | Dialog-seen bit |
+  | --- | --- |
+  | Pakapon | `0x1AD9C` bit 7 |
+  | Kimpon | `0x1AD9D` bit 0 |
+  | Fah Zakpon | `0x1AD9D` bit 1 |
+  | Rah Gashapon | `0x1AD9D` bit 2 |
+  | Kampon | `0x1AD9D` bit 3 |
+
+  Clearing a bit makes that Patapon's intro **replay** on the next interaction — it
+  tracks only "has been talked to," not the unlock (clearing it does not remove the
+  minigame). Mapped offline with the cap-count timing oracle plus the constraint that
+  a dialog bit must be a temporal subset of that Patapon's revive bits (you talk only
+  after reviving); the data-locked Zakpon/Gashpon pair and the rest were confirmed on
+  hardware by clearing each bit and seeing exactly that Patapon's intro replay.
 
 Because `0x1AD71` was earlier misclassified as a purely volatile byte, the
 "unlock everything" copy skipped it, leaving the fifth minigame and the

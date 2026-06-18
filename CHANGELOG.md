@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- Mapped the per-Patapon **dialog-seen** bits in `docs/save-format.md`: the one-time
+  introduction-dialog flags (`0x1AD9C` bit 7 Pakapon; `0x1AD9D` bits 0–3 Kimpon,
+  Fah Zakpon, Rah Gashapon, Kampon), found via the cap-count timing oracle plus the
+  dialog-subset-of-revive constraint and confirmed on hardware (clearing each bit
+  replays exactly that Patapon's intro).
 - Mapped the full **bonus-Patapon revive table** in `docs/save-format.md`: all five
   Patapons as a contiguous run of bit-pairs (`0x1AD71` bits 4,5 Pakapon; bits 6,7
   Kimpon; `0x1AD72` bits 0,1 Fah Zakpon; bits 2,3 Rah Gashapon; bits 4,5 Kampon),
