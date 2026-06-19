@@ -284,6 +284,54 @@ fn player_name_matches_corpus_and_round_trips() {
 }
 
 #[test]
+fn playtime_parses_and_set_round_trips() {
+    let Some(dir) = saves_dir() else {
+        eprintln!("skipped: set PTPNHEX_SAVES_DIR");
+        return;
+    };
+    // Parses the SFO "Play time:" line where present.
+    let mut seen = 0;
+    for save in patapon_saves(&dir) {
+        let slot = SaveSlot::open(&save, &KeyProvider::Embedded).unwrap();
+        if let Some((_, m, s)) = slot.playtime() {
+            assert!(m < 60 && s < 60, "{}", save.display());
+            seen += 1;
+        }
+    }
+    assert!(seen > 0, "no save exposed a play time");
+
+    // Round-trip an edit; the SFO-only change must leave SECURE.BIN untouched.
+    let root = temp_root("playtime");
+    let save = patapon_saves(&dir)
+        .into_iter()
+        .find(|s| s.file_name().unwrap().to_str().unwrap() == "UCES00995_DATA01")
+        .expect("DATA01 present");
+    let work = working_copy(&save, &root);
+    let secure_before = fs::read(work.join("SECURE.BIN")).unwrap();
+    {
+        let mut slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        assert!(slot.set_playtime(0, 70, 0).is_err());
+        slot.set_playtime(12, 34, 56).unwrap();
+        slot.save().unwrap();
+    }
+    let slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+    assert_eq!(slot.playtime(), Some((12, 34, 56)));
+    assert!(slot
+        .sfo()
+        .get_str("SAVEDATA_DETAIL")
+        .unwrap()
+        .contains("Play time: 12:34:56"));
+    assert_eq!(
+        fs::read(work.join("SECURE.BIN")).unwrap(),
+        secure_before,
+        "editing play time must not touch SECURE.BIN"
+    );
+
+    fs::remove_dir_all(&root).ok();
+    eprintln!("play time parsed and edit round-tripped");
+}
+
+#[test]
 fn materials_match_confirmed_values() {
     use ptpnhex_core::save::Material;
     let Some(dir) = saves_dir() else {

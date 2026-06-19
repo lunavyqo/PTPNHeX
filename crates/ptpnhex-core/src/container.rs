@@ -197,6 +197,61 @@ impl SaveSlot {
         Ok(())
     }
 
+    /// The play time shown in the save list, parsed as `(hours, minutes,
+    /// seconds)` from the `PARAM.SFO` `SAVEDATA_DETAIL` text, if present.
+    ///
+    /// Play time is *not* stored in the game body — only as this display text
+    /// (the PSP has no system-level play-time field).
+    pub fn playtime(&self) -> Option<(u32, u8, u8)> {
+        let detail = self.sfo().get_str("SAVEDATA_DETAIL")?;
+        let token = detail
+            .split("Play time:")
+            .nth(1)?
+            .split_whitespace()
+            .next()?;
+        let mut parts = token.split(':');
+        let h: u32 = parts.next()?.parse().ok()?;
+        let m: u8 = parts.next()?.parse().ok()?;
+        let s: u8 = parts.next()?.parse().ok()?;
+        (m < 60 && s < 60).then_some((h, m, s))
+    }
+
+    /// Rewrites the `Play time: HH:MM:SS` value in the `PARAM.SFO` detail
+    /// string, leaving the rest of the detail untouched.
+    ///
+    /// Play time is not stored in the game body, so this edits only the
+    /// save-list label — which the game regenerates on its next in-game save.
+    /// Whether the game reads the edited value back on load is unconfirmed.
+    pub fn set_playtime(&mut self, hours: u32, minutes: u8, seconds: u8) -> Result<()> {
+        if hours > 9999 || minutes >= 60 || seconds >= 60 {
+            return Err(Error::Unsupported(format!(
+                "invalid play time {hours}:{minutes:02}:{seconds:02} \
+                 (hours must be <= 9999, minutes and seconds < 60)"
+            )));
+        }
+        let detail = self
+            .sfo()
+            .get_str("SAVEDATA_DETAIL")
+            .ok_or_else(|| Error::Unsupported("save has no SAVEDATA_DETAIL to edit".into()))?
+            .to_string();
+        const MARKER: &str = "Play time:";
+        let at = detail.find(MARKER).ok_or_else(|| {
+            Error::Unsupported("SAVEDATA_DETAIL has no \"Play time:\" line".into())
+        })?;
+        let value_start = at + MARKER.len();
+        // The value runs to the next newline (or the end of the string).
+        let value_end = detail[value_start..]
+            .find('\n')
+            .map_or(detail.len(), |n| value_start + n);
+        let new_detail = format!(
+            "{}{MARKER} {hours:02}:{minutes:02}:{seconds:02}{}",
+            &detail[..at],
+            &detail[value_end..]
+        );
+        self.sfo_mut().set_str("SAVEDATA_DETAIL", &new_detail)?;
+        Ok(())
+    }
+
     /// The count of `material` (`0` if the player has never obtained it).
     pub fn material(&self, material: crate::save::Material) -> u32 {
         self.material_offset(material)

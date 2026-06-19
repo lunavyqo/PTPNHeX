@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `set-name` command (and `SaveSlot::player_name` / `set_player_name`): read and edit the
   player's "Almighty" name, stored as a UTF-16LE string at `0x1AEF4` in the game data so it
   persists in-game (unlike the regenerated save-list label). `info` now shows the name.
+- `set-playtime` command (and `SaveSlot::playtime` / `set_playtime`): edit the `Play time:`
+  value shown in the save list. Play time is not stored in the game data — only as this
+  `PARAM.SFO` label — so the edit changes the displayed value (the game regenerates the
+  label on its next save). `info` now shows the parsed play time.
 
 ### Documentation
 

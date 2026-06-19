@@ -214,6 +214,21 @@ enum Command {
         #[arg(long, value_name = "DIR")]
         backup_dir: Option<PathBuf>,
     },
+    /// Set the play time shown in the save list (the `PARAM.SFO` label).
+    ///
+    /// Play time is not stored in the game data, only this label — which the
+    /// game regenerates on its next in-game save; in-game persistence is
+    /// unconfirmed.
+    SetPlaytime {
+        /// Path to the save directory.
+        dir: PathBuf,
+        /// New play time as HH:MM:SS (for example `12:34:56`).
+        time: String,
+        /// Copy the original files into this directory before saving.
+        /// Must be outside the save directory.
+        #[arg(long, value_name = "DIR")]
+        backup_dir: Option<PathBuf>,
+    },
 }
 
 fn main() -> Result<()> {
@@ -304,6 +319,11 @@ fn main() -> Result<()> {
             name,
             backup_dir,
         } => set_name(&dir, &name, backup_dir.as_deref()),
+        Command::SetPlaytime {
+            dir,
+            time,
+            backup_dir,
+        } => set_playtime(&dir, &time, backup_dir.as_deref()),
     }
 }
 
@@ -323,6 +343,9 @@ fn info(dir: &Path) -> Result<()> {
     }
     if let Some(detail) = slot.sfo().get_str("SAVEDATA_DETAIL") {
         println!("Detail:   {}", detail.trim().replace('\n', " / "));
+    }
+    if let Some((h, m, s)) = slot.playtime() {
+        println!("Playtime: {h:02}:{m:02}:{s:02}");
     }
     match slot.kaching() {
         Some(k) => println!("Ka-ching: {k}"),
@@ -360,6 +383,29 @@ fn set_name(dir: &Path, name: &str, backup_dir: Option<&Path>) -> Result<()> {
         None => println!("Player name set to {name:?}"),
     }
     Ok(())
+}
+
+/// Sets the save-list play time (PARAM.SFO label only).
+fn set_playtime(dir: &Path, time: &str, backup_dir: Option<&Path>) -> Result<()> {
+    let (h, m, s) = parse_hms(time)?;
+    let mut slot = open(dir)?;
+    slot.set_playtime(h, m, s)
+        .with_context(|| format!("setting play time to {time:?}"))?;
+    back_up_and_save(&slot, backup_dir)?;
+    println!("Play time set to {h:02}:{m:02}:{s:02}");
+    Ok(())
+}
+
+/// Parses an `HH:MM:SS` string into `(hours, minutes, seconds)`.
+fn parse_hms(time: &str) -> Result<(u32, u8, u8)> {
+    let parts: Vec<&str> = time.split(':').collect();
+    let [h, m, s] = parts[..] else {
+        anyhow::bail!("play time must be HH:MM:SS (got {time:?})");
+    };
+    let h = h.parse().with_context(|| format!("hours in {time:?}"))?;
+    let m = m.parse().with_context(|| format!("minutes in {time:?}"))?;
+    let s = s.parse().with_context(|| format!("seconds in {time:?}"))?;
+    Ok((h, m, s))
 }
 
 /// Backs up the originals if a destination was given, then saves.

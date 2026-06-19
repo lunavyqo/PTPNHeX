@@ -140,7 +140,10 @@ editor caps writes at 16 UTF-16 characters, comfortably inside the 64-byte zero
 run that follows the field. Play **time**, by contrast, is *not* stored in the
 body (or anywhere in `SECURE.BIN`) — it exists only as the `Play time: HH:MM:SS`
 text inside the `PARAM.SFO` `SAVEDATA_DETAIL` field, which the PSP has no
-system-level facility for and each game manages itself.
+system-level facility for and each game manages itself. The `set-playtime`
+command rewrites that line; because it is only the label (the game regenerates
+the detail on its next save), whether an edit carries into the running game is
+unconfirmed.
 
 ## The inventory (materials and items)
 
