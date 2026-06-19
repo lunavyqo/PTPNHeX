@@ -202,6 +202,18 @@ enum Command {
         #[arg(long, value_name = "DIR")]
         backup_dir: Option<PathBuf>,
     },
+    /// Set the player's name (the "Almighty" name) in the game data, so it
+    /// persists in-game (unlike the save-list label).
+    SetName {
+        /// Path to the save directory.
+        dir: PathBuf,
+        /// New player name (UTF-16; up to 16 characters).
+        name: String,
+        /// Copy the original files into this directory before saving.
+        /// Must be outside the save directory.
+        #[arg(long, value_name = "DIR")]
+        backup_dir: Option<PathBuf>,
+    },
 }
 
 fn main() -> Result<()> {
@@ -287,6 +299,11 @@ fn main() -> Result<()> {
             &detail,
             backup_dir.as_deref(),
         ),
+        Command::SetName {
+            dir,
+            name,
+            backup_dir,
+        } => set_name(&dir, &name, backup_dir.as_deref()),
     }
 }
 
@@ -298,6 +315,9 @@ fn open(dir: &Path) -> Result<SaveSlot> {
 fn info(dir: &Path) -> Result<()> {
     let slot = open(dir)?;
     println!("Region:   {}", slot.region().serial());
+    if let Some(name) = slot.player_name() {
+        println!("Name:     {name}");
+    }
     if let Some(title) = slot.sfo().get_str("SAVEDATA_TITLE") {
         println!("Title:    {title}");
     }
@@ -325,6 +345,20 @@ fn set_label(
         .with_context(|| format!("setting {label} to {value:?}"))?;
     back_up_and_save(&slot, backup_dir)?;
     println!("{label} set to: {value}");
+    Ok(())
+}
+
+/// Sets the player's name in the game data (persists in-game).
+fn set_name(dir: &Path, name: &str, backup_dir: Option<&Path>) -> Result<()> {
+    let mut slot = open(dir)?;
+    let before = slot.player_name();
+    slot.set_player_name(name)
+        .with_context(|| format!("setting the player name to {name:?}"))?;
+    back_up_and_save(&slot, backup_dir)?;
+    match before {
+        Some(b) => println!("Player name: {b:?} -> {name:?}"),
+        None => println!("Player name set to {name:?}"),
+    }
     Ok(())
 }
 

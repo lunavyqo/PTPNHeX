@@ -133,6 +133,70 @@ impl SaveSlot {
         Ok(())
     }
 
+    /// The player's chosen name (the "Almighty" name) decoded from the body's
+    /// UTF-16LE field, or `None` if the field is not mapped for this region (or
+    /// the payload is too short, as on the small system save).
+    pub fn player_name(&self) -> Option<String> {
+        use crate::save::layout::{player_name_offset, PLAYER_NAME_MAX_CHARS};
+        let off = player_name_offset(self.region)?;
+        let mut units = Vec::new();
+        for i in 0..PLAYER_NAME_MAX_CHARS {
+            let p = off + i * 2;
+            let unit = u16::from_le_bytes(self.data.get(p..p + 2)?.try_into().ok()?);
+            if unit == 0 {
+                break;
+            }
+            units.push(unit);
+        }
+        Some(String::from_utf16_lossy(&units))
+    }
+
+    /// Sets the player's name, written as UTF-16LE (NUL-terminated) into the
+    /// game-data field so it persists in-game (unlike the save-list label).
+    ///
+    /// Rejects an empty name, names longer than
+    /// [`PLAYER_NAME_MAX_CHARS`](crate::save::layout::PLAYER_NAME_MAX_CHARS)
+    /// UTF-16 code units, or names containing characters outside the Basic
+    /// Multilingual Plane.
+    pub fn set_player_name(&mut self, name: &str) -> Result<()> {
+        use crate::save::layout::{player_name_offset, PLAYER_NAME_MAX_CHARS};
+        if name.is_empty() {
+            return Err(Error::Unsupported("player name must not be empty".into()));
+        }
+        let units: Vec<u16> = name.encode_utf16().collect();
+        if units.iter().any(|&u| (0xD800..=0xDFFF).contains(&u)) {
+            return Err(Error::Unsupported(
+                "player name contains characters outside the BMP".into(),
+            ));
+        }
+        if units.len() > PLAYER_NAME_MAX_CHARS {
+            return Err(Error::Unsupported(format!(
+                "player name is {} characters; the maximum is {PLAYER_NAME_MAX_CHARS}",
+                units.len()
+            )));
+        }
+        let off = player_name_offset(self.region).ok_or_else(|| {
+            Error::Unsupported(format!(
+                "the player name is not mapped for {}",
+                self.region.serial()
+            ))
+        })?;
+        // The name plus a UTF-16 NUL terminator; the field sits in an all-zero run.
+        let field = (PLAYER_NAME_MAX_CHARS + 1) * 2;
+        let slot = self
+            .data
+            .get_mut(off..off + field)
+            .ok_or_else(|| Error::Malformed {
+                what: "SECURE.BIN",
+                reason: "payload too short for the player-name field".into(),
+            })?;
+        slot.fill(0);
+        for (i, unit) in units.iter().enumerate() {
+            slot[i * 2..i * 2 + 2].copy_from_slice(&unit.to_le_bytes());
+        }
+        Ok(())
+    }
+
     /// The count of `material` (`0` if the player has never obtained it).
     pub fn material(&self, material: crate::save::Material) -> u32 {
         self.material_offset(material)

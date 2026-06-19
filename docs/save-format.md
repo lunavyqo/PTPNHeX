@@ -120,14 +120,27 @@ mapped.
 
 ## Confirmed fields
 
-| field    | offset    | type      | range   | notes                         |
-| -------- | --------- | --------- | ------- | ----------------------------- |
-| Ka-ching | `0x1A0EC` | u32 (LE)  | 0–99999 | in-game currency              |
+| field       | offset    | type           | range   | notes                       |
+| ----------- | --------- | -------------- | ------- | --------------------------- |
+| Ka-ching    | `0x1A0EC` | u32 (LE)       | 0–99999 | in-game currency            |
+| Player name | `0x1AEF4` | UTF-16LE, NUL-terminated | — | the chosen "Almighty" name |
 
 **Ka-ching** was confirmed by reading the value off the game's screen for two
 saves and finding the offset that uniquely held each value (`DATA01` = 564,
 `DATA50` = 598). It behaves like currency across the whole corpus — it rises and
 falls and never exceeds the game's 99999 cap.
+
+**Player name** is stored as a UTF-16LE string at `0x1AEF4`, NUL-terminated and
+left-aligned in an all-zero run. It is the single canonical copy in the body: an
+ASCII search for the name finds nothing (the encoding is UTF-16), and the UTF-16
+search finds exactly one occurrence, constant across the whole corpus (the name
+appended to Divine-weapon labels is built at display time, not stored). The exact
+in-game entry length limit is not determinable from a single-player corpus; the
+editor caps writes at 16 UTF-16 characters, comfortably inside the 64-byte zero
+run that follows the field. Play **time**, by contrast, is *not* stored in the
+body (or anywhere in `SECURE.BIN`) — it exists only as the `Play time: HH:MM:SS`
+text inside the `PARAM.SFO` `SAVEDATA_DETAIL` field, which the PSP has no
+system-level facility for and each game manages itself.
 
 ## The inventory (materials and items)
 

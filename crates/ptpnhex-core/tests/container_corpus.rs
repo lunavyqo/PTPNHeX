@@ -246,6 +246,44 @@ fn sfo_label_edit_round_trips_and_leaves_secure_untouched() {
 }
 
 #[test]
+fn player_name_matches_corpus_and_round_trips() {
+    let Some(dir) = saves_dir() else {
+        eprintln!("skipped: set PTPNHEX_SAVES_DIR");
+        return;
+    };
+    // The whole corpus is one player, so the name is constant where present.
+    // (The small system save DATA00 has no name field and returns None.)
+    let mut seen = 0;
+    for save in patapon_saves(&dir) {
+        let slot = SaveSlot::open(&save, &KeyProvider::Embedded).unwrap();
+        if let Some(name) = slot.player_name() {
+            assert_eq!(name, "Bbra", "{}", save.display());
+            seen += 1;
+        }
+    }
+    assert!(seen > 0, "no save exposed a player name");
+
+    // Round-trip a new name through disk, and reject an over-long one.
+    let root = temp_root("name");
+    let save = patapon_saves(&dir)
+        .into_iter()
+        .find(|s| s.file_name().unwrap().to_str().unwrap() == "UCES00995_DATA01")
+        .expect("DATA01 present");
+    let work = working_copy(&save, &root);
+    {
+        let mut slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        assert!(slot.set_player_name("ThisNameIsWayTooLong").is_err());
+        slot.set_player_name("Patapon7").unwrap();
+        slot.save().unwrap();
+    }
+    let slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+    assert_eq!(slot.player_name().as_deref(), Some("Patapon7"));
+
+    fs::remove_dir_all(&root).ok();
+    eprintln!("player name read as Bbra and edit round-tripped");
+}
+
+#[test]
 fn materials_match_confirmed_values() {
     use ptpnhex_core::save::Material;
     let Some(dir) = saves_dir() else {

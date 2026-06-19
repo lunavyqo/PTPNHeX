@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `set-name` command (and `SaveSlot::player_name` / `set_player_name`): read and edit the
+  player's "Almighty" name, stored as a UTF-16LE string at `0x1AEF4` in the game data so it
+  persists in-game (unlike the regenerated save-list label). `info` now shows the name.
+
 ### Documentation
 
 - Mapped the per-Patapon **minigame-played** bits in `docs/save-format.md`: the flag set

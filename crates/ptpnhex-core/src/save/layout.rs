@@ -21,6 +21,27 @@ pub fn kaching_offset(region: Region) -> Option<usize> {
     }
 }
 
+/// Maximum player-name length the editor writes, in UTF-16 code units.
+///
+/// The name sits in a 64-byte run that is zero across the entire corpus; this
+/// conservative cap stays well inside it. The game's own name-entry limit may be
+/// lower — confirm on hardware before relying on long names.
+pub const PLAYER_NAME_MAX_CHARS: usize = 16;
+
+/// Offset of the player-name field (UTF-16LE, NUL-terminated) for `region`.
+///
+/// Confirmed for Europe at `0x1AEF4`: the entered name is the single canonical
+/// copy in the body (stored UTF-16LE — an ASCII search misses it), constant
+/// across the whole corpus, left-aligned and NUL-padded (see
+/// `docs/save-format.md`).
+pub fn player_name_offset(region: Region) -> Option<usize> {
+    match region {
+        Region::Europe => Some(0x1AEF4),
+        // US/JP layouts not yet reverse-engineered.
+        Region::NorthAmerica | Region::Japan => None,
+    }
+}
+
 /// Fixed byte offsets of the 20 materials' inventory records, in canonical
 /// order (Leather Meat … Magic Alloy), for `region`.
 ///
