@@ -19,6 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- Documented two hardware-confirmed minigame mechanics in `docs/save-format.md`: the
+  **minigame-played** flag also gates that minigame's **first-play intro dialogue**
+  (clearing it replays the intro — there is no separate dialogue flag); and **Kampon's**
+  minigame crafts a random not-yet-owned **divine equipment** piece, else Magic Alloy,
+  gated purely by **inventory ownership** rather than a saved "already-crafted" flag
+  (proven both ways: stripping divine gear re-enabled crafting; adding it blocked it).
 - Mapped the per-Patapon **minigame-played** bits in `docs/save-format.md`: the flag set
   the first time each minigame is played, spanning two bytes (`0x1AD9F` bits 6–7 Pakapon,
   Fah Zakpon; `0x1ADA0` bits 0/4/5 Rah Gashapon, Kimpon, Kampon), found by a controlled

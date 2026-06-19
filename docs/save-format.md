@@ -599,12 +599,27 @@ lives in the unlock bitfields as **two parallel bit sets**:
   | Kimpon (mountain) | `0x1ADA0` bit 4 |
   | Kampon | `0x1ADA0` bit 5 |
 
-  Cosmetic (it does not affect minigame availability). Mapped by a controlled test:
+  It does not affect minigame availability, but this same bit **also gates that
+  minigame's first-play intro dialogue** — clearing it makes the intro replay the
+  next time the minigame is played (hardware-confirmed: clearing Pakapon's bit on a
+  complete save replayed its intro, with the revive and first-meet *dialog-seen*
+  bits left untouched). So the one bit doubles as the first-play-dialogue marker;
+  there is no separate flag for it. Mapped by a controlled test:
   from the earliest save (no minigame played), all five Patapons were revived with the
   editor, each minigame played once, and the single bit each play set was read from a
   whole-save diff — which is how the two `0x1AD9F` flags surfaced (clearing only
   `0x1ADA0` would have missed them). Note minigames also consume a material as input,
   and some grant an inventory item; both are ordinary inventory changes.
+
+Kampon's minigame is the notable reward case: it randomly crafts a **divine
+equipment** piece, but only one the player does not already own — once all nine
+divine pieces are owned, it yields **Magic Alloy** instead. This is gated purely by
+**inventory ownership**, not by any saved "already-crafted" flag. A two-way hardware
+test confirmed it: stripping all divine gear from a complete save (clearing the
+inventory owned-flags) let the minigame craft divine again (a Divine Sword), while
+adding all divine gear to an early save where none had ever been crafted made it
+yield only Magic Alloy. So removing a divine piece makes it craftable again, and
+there is nothing else to track — the inventory is the source of truth.
 
 Because `0x1AD71` was earlier misclassified as a purely volatile byte, the
 "unlock everything" copy skipped it, leaving the fifth minigame and the
