@@ -106,10 +106,16 @@ rarepon whether on a Yaripon, a Megapon, or any other unit:
 | `0xFF61E4DA` | Gekolos |
 | `0xFFFFFFFF` | none / basic |
 
-This is the only per-unit field that tracks the rarepon: a unit's displayed name,
-headpiece, and base stats are derived from this id rather than stored alongside it,
-so editing `+0x48` alone produces an otherwise-Barsala unit wearing a different
-rarepon's body — a combination the game cannot normally create.
+Editing this field changes **only the unit's body** — producing an
+otherwise-unchanged unit wearing a different rarepon's body, a hybrid the game
+cannot normally make. The rarepon's displayed **name, head, and base stats are a
+separate, sticky per-unit value** that does *not* follow this field: a unit whose
+`+0x48` is changed keeps its original name/head/stats (and a unit keeps them even
+when both `+0x48` and the nearby `+0xd0` are changed). `+0xd0` correlates with
+the rarepon across the corpus but was tested on hardware and does **not** control
+the identity either — changing it alone did nothing. Where that name/head/stats
+value is stored is not yet mapped, so a *full* rarepon swap is not yet possible;
+only the body is editable.
 
 A second, **smaller** set of unit records appears near `0x30000`. It is **not** a
 copy of the roster: it holds verbatim copies of *some* unit records but in a

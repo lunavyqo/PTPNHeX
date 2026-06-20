@@ -19,6 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- Corrected the rarepon section of `docs/save-format.md`: a unit's `+0x48` controls
+  **only its body**, not its name/head/stats. A hardware retest disproved the earlier
+  claim that the name/head/stats are "derived from" that id — they are a separate, as-yet
+  unmapped per-unit value (the nearby `+0xd0`, despite correlating with the rarepon, does
+  not control them either), so a full rarepon swap is not yet possible.
+
 - Documented two hardware-confirmed minigame mechanics in `docs/save-format.md`: the
   **minigame-played** flag also gates that minigame's **first-play intro dialogue**
   (clearing it replays the intro — there is no separate dialogue flag); and **Kampon's**
