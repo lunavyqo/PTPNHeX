@@ -106,16 +106,23 @@ rarepon whether on a Yaripon, a Megapon, or any other unit:
 | `0xFF61E4DA` | Gekolos |
 | `0xFFFFFFFF` | none / basic |
 
-Editing this field changes **only the unit's body** — producing an
-otherwise-unchanged unit wearing a different rarepon's body, a hybrid the game
-cannot normally make. The rarepon's displayed **name, head, and base stats are a
-separate, sticky per-unit value** that does *not* follow this field: a unit whose
-`+0x48` is changed keeps its original name/head/stats (and a unit keeps them even
-when both `+0x48` and the nearby `+0xd0` are changed). `+0xd0` correlates with
-the rarepon across the corpus but was tested on hardware and does **not** control
-the identity either — changing it alone did nothing. Where that name/head/stats
-value is stored is not yet mapped, so a *full* rarepon swap is not yet possible;
-only the body is editable.
+Editing this field changes the unit's **body** appearance. The **headpiece** is a
+**separate, also-editable** pair of fields — the `hlm` id string at `+0xA4` and its
+name-hash at `+0xC4`: writing another rarepon's head id and hash puts that head on
+an otherwise-unchanged body (confirmed on hardware). The head ids run `hlm010`–
+`hlm015` for Pyokola / Gekolos / Mofeel / Tikulee / Mogyoon / Barsala (`hlm001` for
+basic); on a rarepon this `hlm` field is its **headpiece, not an equipped helmet**
+(rarepons have no helmet slot). A packed per-unit field at `+0x4c` must be kept
+consistent for an edited head to render. So a unit's **body and head are both
+editable**, including hybrids the game cannot normally make.
+
+The rarepon's displayed **name and base stats**, however, are **computed when the
+unit is created and cached** into its record — they are *not* re-derived on load, so
+a unit keeps its original name and stats even after its body and head are changed.
+Neither `+0x4c` nor the `+0xd0` echo (which equals `160 + the head number`) controls
+them — both were tested on hardware and changing them alone did nothing. Where the
+name/stats cache lives is not yet mapped, so a *full* identity swap (name + stats) is
+not yet possible, though body and head are.
 
 A second, **smaller** set of unit records appears near `0x30000`. It is **not** a
 copy of the roster: it holds verbatim copies of *some* unit records but in a

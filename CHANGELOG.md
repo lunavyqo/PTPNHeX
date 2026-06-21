@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- Updated the rarepon section of `docs/save-format.md`: a unit's **headpiece** is a
+  separate, also-editable pair of fields (the `hlm` id at `+0xA4` and its hash at `+0xC4`),
+  hardware-confirmed — so **body and head are both editable** (the `+0xA4` field is the
+  rarepon's headpiece, not an equipped helmet; rarepons have no helmet slot). The displayed
+  **name and base stats** are computed at the unit's creation and cached, so they don't
+  follow body/head edits, and their storage is still unmapped (a full identity swap isn't
+  possible yet). Supersedes the earlier "only the body is editable" note.
 - Corrected the rarepon section of `docs/save-format.md`: a unit's `+0x48` controls
   **only its body**, not its name/head/stats. A hardware retest disproved the earlier
   claim that the name/head/stats are "derived from" that id — they are a separate, as-yet
