@@ -29,13 +29,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Documentation
 
 - Rewrote the rarepon section of `docs/save-format.md`: a rarepon is stored **entirely in
-  the unit record** and is **fully editable** — body (`+0x48`, appearance and derived stats),
+  the unit record** and is **fully editable** — body (`+0x48`, the appearance),
   displayed name and class (the low and high nibbles of `+0x4E`), headpiece (`+0xA4` id,
   `+0xC4` hash, `+0xC8` no-helmet-slot flag), and the `+0xD0` echo. Confirmed by constructing
   a rarepon on a basic unit and reading it back in-game. This replaces the earlier,
   superseded notes ("only the body is editable", then "body + head, but name/stats are an
   unmapped cache") — there is no external cache; the name is the `+0x4E` low nibble, and the
-  stats are derived from the body at runtime. Includes the full per-rarepon table (body,
+  stats are derived at runtime from the rarepon's whole consistent identity, not the body
+  alone. Includes the full per-rarepon table (body,
   headpiece, hash, echo, name nibble) and the class-nibble map, and corrects the swapped
   Yaripon/Yumipon class labels (`unit002` = Yumipon/bow, `unit004` = Yaripon/spear).
 

@@ -98,7 +98,7 @@ and cached, not editable" were wrong; there is no external cache.)
 
 | field | meaning |
 | --- | --- |
-| `+0x48` `u32` LE | **body** — the appearance, and the **stats** derived from it at runtime |
+| `+0x48` `u32` LE | **body** — the appearance (a 32-bit name-hash) |
 | `+0x4E` byte | **high nibble = displayed class**, **low nibble = displayed name** |
 | `+0xA4` string | **headpiece** id (`hlmNNN_NN`) |
 | `+0xC4` `u32` LE | headpiece name-hash |
@@ -106,9 +106,14 @@ and cached, not editable" were wrong; there is no external cache.)
 | `+0xD0` byte | numeric echo, `160 + head number` |
 
 The **body** code is a 32-bit name-hash (high byte always `0xFF`), shared across
-classes. The body drives appearance *and* stats — the game computes the rarepon's
-power from it on load, so there is no separate stored stat block (units of different
-rarepons read identical "stat" bytes). Each rarepon's full data:
+classes. A rarepon's **stats** are derived at runtime, not stored — units of different
+rarepons read identical raw "stat" bytes at base level, and there is no separate stored
+stat block. They follow the rarepon's *whole, consistent* identity — body, headpiece,
+and name nibble set together — **not the body alone**: changing only the body, while the
+headpiece and name nibble still name a different rarepon, does not confer the new body's
+stats; the unit keeps its old identity's stats, or falls back to a basic head and basic
+stats. So a stat change requires writing the whole field set below together (which
+`set-rarepon` does). Each rarepon's full data:
 
 | rarepon | body (`+0x48`) | headpiece | head-hash (`+0xC4`) | echo (`+0xD0`) | name nibble (`+0x4E`) |
 | --- | --- | --- | --- | --- | --- |
