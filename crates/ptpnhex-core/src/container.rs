@@ -653,6 +653,112 @@ impl SaveSlot {
         self.data[base + RECORD_HEAD_ECHO] = rarepon.head_echo().expect("non-basic");
     }
 
+    /// The id of unit `index`'s equipped weapon (for example `"wpn004_008_01"`),
+    /// or `None` if the slot is empty or holds no weapon.
+    pub fn unit_weapon(&self, index: usize) -> Option<&str> {
+        let base = self.unit_record(index)?;
+        let off = base + crate::save::layout::RECORD_WEAPON_ID;
+        let bytes = &self.data[off..off + 16];
+        let end = bytes.iter().position(|&b| b == 0).unwrap_or(bytes.len());
+        let id = std::str::from_utf8(&bytes[..end]).ok()?;
+        id.starts_with("wpn").then_some(id)
+    }
+
+    /// The highest weapon tier available to unit `index` (its family's top tier),
+    /// or `None` if the slot is empty or the unit has no weapon.
+    pub fn unit_weapon_max_tier(&self, index: usize) -> Option<u8> {
+        let (family, _, _) = crate::save::weapon::parse(self.unit_weapon(index)?)?;
+        Some(crate::save::weapon::max_tier(family))
+    }
+
+    /// Sets unit `index`'s weapon to `tier` within its current weapon family,
+    /// writing the new id and its CRC32 name-hash, mirroring the deployed-formation
+    /// copy, and granting enough copies of the weapon in inventory to keep it
+    /// equipped.
+    ///
+    /// The game validates a unit's weapon against inventory ownership on load: an
+    /// un-owned weapon silently reverts to the family's tier-1 weapon, and each
+    /// equipped unit consumes one copy. So this also raises the weapon's inventory
+    /// count to cover every unit now wielding it (all confirmed on hardware).
+    ///
+    /// # Errors
+    /// - the roster slot is empty, or the unit has no weapon;
+    /// - `tier` is outside `1..=max` for the family (8, or 9 for Tatepon swords);
+    /// - the region's weapon layout is unmapped.
+    pub fn set_unit_weapon(&mut self, index: usize, tier: u8) -> Result<()> {
+        let current = self
+            .unit_weapon(index)
+            .ok_or_else(|| Error::Unsupported(format!("no weapon at roster index {index}")))?;
+        let (family, _, variant) = crate::save::weapon::parse(current)
+            .ok_or_else(|| Error::Unsupported(format!("unrecognised weapon id `{current}`")))?;
+        let variant = variant.to_owned();
+        let max = crate::save::weapon::max_tier(family);
+        if tier < 1 || tier > max {
+            return Err(Error::Unsupported(format!(
+                "weapon tier {tier} out of range 1..={max} for family {family:03}"
+            )));
+        }
+        let new_id = format!("wpn{family:03}_{tier:03}_{variant}");
+
+        // roster record, then every formation copy sharing this unit's global id
+        let base = self.unit_record(index).expect("checked by unit_weapon");
+        let gid = u32::from_le_bytes(
+            self.data[base + crate::save::layout::RECORD_GID..][..4]
+                .try_into()
+                .expect("4 bytes"),
+        );
+        self.write_weapon(base, &new_id);
+        if let Some(fbase) = crate::save::layout::formation_base(self.region) {
+            let stride = crate::save::layout::ROSTER_STRIDE;
+            for j in 0..crate::save::layout::ROSTER_CAPACITY {
+                let rec = fbase + j * stride;
+                if rec + stride > self.data.len() {
+                    break;
+                }
+                let is_unit =
+                    &self.data[rec + crate::save::layout::RECORD_UNIT_ID..][..4] == b"unit";
+                let rec_gid = u32::from_le_bytes(
+                    self.data[rec + crate::save::layout::RECORD_GID..][..4]
+                        .try_into()
+                        .expect("4 bytes"),
+                );
+                if is_unit && rec_gid == gid {
+                    self.write_weapon(rec, &new_id);
+                }
+            }
+        }
+
+        // grant: raise the weapon's inventory count to cover every unit wielding it
+        let inv = crate::save::layout::weapon_inventory_offset(self.region, family, tier)
+            .filter(|&o| o + 4 <= self.data.len())
+            .ok_or_else(|| {
+                Error::Unsupported(format!(
+                    "weapon inventory slot for family {family:03} tier {tier} is unmapped"
+                ))
+            })?;
+        let wielding = (0..self.army_size())
+            .filter(|&i| self.unit_weapon(i) == Some(new_id.as_str()))
+            .count() as u32;
+        let want = wielding.clamp(1, crate::save::items::ITEM_MAX);
+        let count = want
+            .max(self.inventory_count(inv))
+            .min(crate::save::items::ITEM_MAX) as u8;
+        self.set_inventory(inv, count);
+        Ok(())
+    }
+
+    /// Writes a weapon id string (+ NUL) and its CRC32 name-hash into the record
+    /// at `base`. Shared by the roster record and its formation copy.
+    fn write_weapon(&mut self, base: usize, id: &str) {
+        let bytes = id.as_bytes();
+        let off = base + crate::save::layout::RECORD_WEAPON_ID;
+        self.data[off..off + bytes.len()].copy_from_slice(bytes);
+        self.data[off + bytes.len()] = 0;
+        let hash = crate::save::weapon::crc32(bytes);
+        self.data[base + crate::save::layout::RECORD_WEAPON_HASH..][..4]
+            .copy_from_slice(&hash.to_le_bytes());
+    }
+
     /// The byte offset of unit `index`'s record if the slot is filled (its class
     /// id begins with `unit`), else `None`.
     fn unit_record(&self, index: usize) -> Option<usize> {

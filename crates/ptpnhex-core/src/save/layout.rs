@@ -151,6 +151,11 @@ pub const RECORD_HEAD_HASH: usize = 0xC4;
 pub const RECORD_HEAD_FLAG: usize = 0xC8;
 /// Record-relative offset of the headpiece numeric echo (`160 + hlm#`).
 pub const RECORD_HEAD_ECHO: usize = 0xD0;
+/// Record-relative offset of a unit's equipped weapon id string
+/// (`wpnNNN_TTT_VV`); see [`weapon`](crate::save::weapon).
+pub const RECORD_WEAPON_ID: usize = 0x74;
+/// Record-relative offset of the equipped weapon id's name-hash (`u32` LE).
+pub const RECORD_WEAPON_HASH: usize = 0x94;
 
 /// Byte offset of unit record `index` for `region`, if that index is within the
 /// roster capacity.
@@ -171,6 +176,29 @@ pub fn formation_base(region: Region) -> Option<usize> {
         Region::Europe => Some(0x30878),
         Region::NorthAmerica | Region::Japan => None,
     }
+}
+
+/// Inventory record offset of weapon `family`, tier `tier` (1-based).
+///
+/// Each weapon family is a block of fixed 4-byte inventory records, one per
+/// tier. The game validates a unit's equipped weapon against ownership, so an
+/// editor must grant the item here or the weapon reverts to the family's tier-1
+/// weapon on load. The family base offsets were verified against every equipped
+/// weapon in the save corpus (each maps to an owned inventory record).
+pub fn weapon_inventory_offset(region: Region, family: u16, tier: u8) -> Option<usize> {
+    if tier == 0 {
+        return None;
+    }
+    let base = match (region, family) {
+        (Region::Europe, 1) => 0x19EA0, // Yumipon — bows
+        (Region::Europe, 3) => 0x19E50, // Tatepon — swords / axes
+        (Region::Europe, 4) => 0x19E28, // Yaripon — spears
+        (Region::Europe, 6) => 0x19EC8, // Kibapon — halberds
+        (Region::Europe, 7) => 0x19F18, // Dekapon — hammers / maces
+        (Region::Europe, 8) => 0x19F40, // Megapon — horns
+        _ => return None,
+    };
+    Some(base + (tier as usize - 1) * 4)
 }
 
 /// Bit (within the byte at [`loadout_slots_offset`]) that opens the mission-prep

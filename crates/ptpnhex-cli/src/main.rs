@@ -109,6 +109,20 @@ enum Command {
         #[arg(long, value_name = "DIR")]
         backup_dir: Option<PathBuf>,
     },
+    /// Set a unit's weapon tier by its roster index (see `units`). Grants the
+    /// weapon in inventory so it stays equipped.
+    SetWeapon {
+        /// Path to the save directory.
+        dir: PathBuf,
+        /// Roster index of the unit (from `units`).
+        index: usize,
+        /// Weapon tier (1 = basic … 8 = Divine; Tatepon swords reach 9), or `max`.
+        tier: String,
+        /// Copy the original files into this directory before saving.
+        /// Must be outside the save directory.
+        #[arg(long, value_name = "DIR")]
+        backup_dir: Option<PathBuf>,
+    },
     /// Open or close the mission-prep loadout slots (miracle and stew, together).
     SetLoadoutSlots {
         /// Path to the save directory.
@@ -267,6 +281,12 @@ fn main() -> Result<()> {
             rarepon,
             backup_dir,
         } => set_rarepon(&dir, index, &rarepon, backup_dir.as_deref()),
+        Command::SetWeapon {
+            dir,
+            index,
+            tier,
+            backup_dir,
+        } => set_weapon(&dir, index, &tier, backup_dir.as_deref()),
         Command::SetLoadoutSlots {
             dir,
             state,
@@ -559,7 +579,8 @@ fn units(dir: &Path) -> Result<()> {
             },
             |r| r.name().to_string(),
         );
-        println!("  [{i:>3}] {class:<8} {rarepon}");
+        let weapon = slot.unit_weapon(i).unwrap_or("-");
+        println!("  [{i:>3}] {class:<8} {rarepon:<10} {weapon}");
     }
     Ok(())
 }
@@ -592,6 +613,27 @@ fn set_rarepon(dir: &Path, index: usize, rarepon: &str, backup_dir: Option<&Path
     slot.set_unit_rarepon(index, r)?;
     back_up_and_save(&slot, backup_dir)?;
     println!("Unit {index}: rarepon set to {}", r.name());
+    Ok(())
+}
+
+fn set_weapon(dir: &Path, index: usize, tier: &str, backup_dir: Option<&Path>) -> Result<()> {
+    let mut slot = open(dir)?;
+    let max = slot.unit_weapon_max_tier(index).with_context(|| {
+        format!(
+            "no weapon at roster index {index} (army has {} units; see `units`)",
+            slot.army_size()
+        )
+    })?;
+    let tier_num: u8 = if tier.eq_ignore_ascii_case("max") {
+        max
+    } else {
+        tier.parse()
+            .with_context(|| format!("weapon tier must be a number (1..={max}) or `max`"))?
+    };
+    slot.set_unit_weapon(index, tier_num)?;
+    let weapon = slot.unit_weapon(index).unwrap_or("?").to_owned();
+    back_up_and_save(&slot, backup_dir)?;
+    println!("Unit {index}: weapon set to {weapon} (tier {tier_num})");
     Ok(())
 }
 

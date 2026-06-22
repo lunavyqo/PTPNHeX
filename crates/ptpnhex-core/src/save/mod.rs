@@ -10,6 +10,7 @@ pub mod layout;
 pub mod materials;
 pub mod rarepon;
 mod region;
+pub mod weapon;
 
 pub use bonus_patapon::BonusPatapon;
 pub use items::Item;

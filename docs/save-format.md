@@ -51,19 +51,20 @@ unit count (matching the filled-record count on most saves), and the constant
 is a constant `2`.)
 
 Each record carries ASCII identifiers for a unit and its equipped gear at fixed
-record-relative offsets, each preceded by a 4-byte hash:
+record-relative offsets; every id is immediately followed, `0x20` bytes later, by
+its name-hash (a `u32` LE — see *Weapons and gear*):
 
-| offset | field |
-| --- | --- |
-| `+0x00` | a name slot (`none` when unnamed) |
-| `+0x50` | `unitNNN_01_01` — the class |
-| `+0x74` | `wpnNNN_III_VV` / `rwpnNNN_III_VV` — equipped weapon (or rare weapon) |
-| `+0xA4` | `hlmNNN_NN` — headpiece (on a rarepon) or equipped helmet (on a basic) |
-| `+0xD4` | `sldNNN_II` — equipped shield (shield units only) |
+| offset | id | name-hash |
+| --- | --- | --- |
+| `+0x00` | a name slot (`none` when unnamed) | — |
+| `+0x50` | `unitNNN_01_01` — the class | `+0x70` |
+| `+0x74` | `wpnNNN_TTT_VV` — equipped weapon | `+0x94` |
+| `+0xA4` | `hlmNNN_NN` — headpiece (rarepon) or equipped helmet (basic) | `+0xC4` |
+| `+0xD4` | `sldNNN_II` — equipped shield (Tatepon only) | `+0xF4` |
 
 ```
 unit002_01_01   wpn001_008_01   hlm014_01          (a Mogyoon Yumipon: bow + Mogyoon headpiece)
-unit003_01_01   rwpn003_009_01  hlm015_01  sld008_01 (a Barsala Tatepon: rare weapon + shield)
+unit003_01_01   wpn003_009_01   hlm015_01  sld008_01 (a Barsala Tatepon: sword + shield)
 ```
 
 The `NNN` in a class id selects the unit type, identified by the weapon family it
@@ -72,19 +73,46 @@ carries:
 | class id | weapon | unit |
 | --- | --- | --- |
 | `unit002` | `wpn001` (bows) | Yumipon |
-| `unit003` | `rwpn003` + `sld` (swords/axes) | Tatepon |
+| `unit003` | `wpn003` + `sld` (swords/axes) | Tatepon |
 | `unit004` | `wpn004` (spears) | Yaripon |
 | `unit006` | `wpn006` (cavalry) | Kibapon |
 | `unit007` | `wpn007` (maces) | Dekapon |
 | `unit008` | `wpn008` (horns) | Megapon |
 
 The equipped-gear ids reuse the **same family/index taxonomy as the inventory
-armory** — `wpn001_008` is the spear family, item 8 (the eighth spear catalogued
+armory** — `wpn004_008` is the spear family, item 8 (the eighth spear catalogued
 under *Items*) — so units and the armory share one item-id space. Between the
-identifiers each record also holds numeric fields (unit level and stats); those
-are not yet individually decoded. (One field nearby, the `u32` at `+0xC4`, is the
-**name-hash of the `+0xA4` headpiece/helmet** — `hlm015`→`0xDA216E8F`,
-`hlm014`→`0x629D09EA`, and so on — see *Rarepon* below.)
+identifiers each record also holds numeric per-unit fields (stats), not yet
+individually decoded.
+
+#### Weapons and gear
+
+Every gear id's **name-hash** (the `u32` `0x20` bytes past the id) is the standard
+**CRC32** (zlib/IEEE) of the exact id string — verified against every weapon,
+helmet and shield id in the corpus (2779/2779), so a gear id's hash is computed,
+never looked up (`hlm014_01`→`0x629D09EA`, `wpn004_008_01`→`0x057FB686`, …).
+
+A weapon id is `wpnFFF_TTT_01`: `FFF` is the family (one per class — Yumipon `001`,
+Tatepon `003`, Yaripon `004`, Kibapon `006`, Dekapon `007`, Megapon `008`) and
+`TTT` is the **tier** (higher = stronger; every family tops out at `008`, the Divine
+weapon, and Tatepon swords add a 9th, `009`, Gong's Scythe). A unit's power comes
+from its gear tier, not its rarepon.
+
+**Equipping is inventory-gated** (hardware-confirmed). On load the game validates a
+unit's weapon against the inventory: an un-owned weapon silently reverts to the
+family's tier-1 weapon, and each equipped unit consumes one copy. So changing a
+unit's weapon also means **granting** that weapon in the inventory with a count
+covering every unit that wields it. A family is a fixed 4-byte-per-tier block; the
+tier's record sits at `base + (tier - 1) * 4`:
+
+| family (class) | inventory base |
+| --- | --- |
+| `wpn001` (Yumipon) | `0x19EA0` |
+| `wpn003` (Tatepon) | `0x19E50` |
+| `wpn004` (Yaripon) | `0x19E28` |
+| `wpn006` (Kibapon) | `0x19EC8` |
+| `wpn007` (Dekapon) | `0x19F18` |
+| `wpn008` (Megapon) | `0x19F40` |
 
 #### Rarepon
 

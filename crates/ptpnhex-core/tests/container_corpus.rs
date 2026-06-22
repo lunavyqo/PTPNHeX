@@ -796,3 +796,111 @@ fn army_roster_reads_and_rarepon_round_trips() {
     fs::remove_dir_all(&root).ok();
     eprintln!("army roster read and full rarepon recipe round-tripped through disk");
 }
+
+#[test]
+fn set_weapon_round_trips_grants_and_mirrors() {
+    use ptpnhex_core::save::layout;
+
+    const ROSTER_BASE: usize = 0x20;
+    const STRIDE: usize = 0x104;
+    const UNIT_ID: usize = 0x50;
+    const WEAPON_ID: usize = 0x74;
+    const WEAPON_HASH: usize = 0x94;
+    const GID: usize = 0x24;
+
+    // Independent CRC32 (zlib/IEEE) so the test checks the stored hash itself.
+    fn crc32(bytes: &[u8]) -> u32 {
+        let mut crc: u32 = 0xFFFF_FFFF;
+        for &b in bytes {
+            crc ^= b as u32;
+            for _ in 0..8 {
+                let mask = (crc & 1).wrapping_neg();
+                crc = (crc >> 1) ^ (0xEDB8_8320 & mask);
+            }
+        }
+        !crc
+    }
+    // family + tier from a "wpnFFF_TTT_VV" id.
+    fn fam_tier(id: &str) -> (u16, u8) {
+        let mut p = id.strip_prefix("wpn").unwrap().split('_');
+        (
+            p.next().unwrap().parse().unwrap(),
+            p.next().unwrap().parse().unwrap(),
+        )
+    }
+
+    let Some(dir) = saves_dir() else {
+        eprintln!("skipped: set PTPNHEX_SAVES_DIR");
+        return;
+    };
+    let root = temp_root("weapon");
+    let work = working_copy(&dir.join("UCES00995_DATA46"), &root);
+
+    let target = {
+        let slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        (0..slot.army_size())
+            .find(|&i| slot.unit_weapon(i).is_some())
+            .expect("a unit with a weapon")
+    };
+
+    // Out-of-range tiers are rejected.
+    {
+        let mut slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        assert!(slot.set_unit_weapon(target, 0).is_err(), "tier 0 rejected");
+        assert!(
+            slot.set_unit_weapon(target, 250).is_err(),
+            "an absurd tier is rejected"
+        );
+    }
+
+    // Max the weapon, save, reopen, and verify everything landed.
+    let mut slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+    let max = slot.unit_weapon_max_tier(target).unwrap();
+    let gid = u32::from_le_bytes(
+        slot.data()[ROSTER_BASE + target * STRIDE + GID..][..4]
+            .try_into()
+            .unwrap(),
+    );
+    slot.set_unit_weapon(target, max).unwrap();
+    slot.save().unwrap();
+
+    let slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+    let id = slot.unit_weapon(target).unwrap().to_owned();
+    let (family, tier) = fam_tier(&id);
+    assert_eq!(tier, max, "weapon set to the family's top tier");
+
+    let d = slot.data();
+    let base = ROSTER_BASE + target * STRIDE;
+    let hash = u32::from_le_bytes(d[base + WEAPON_HASH..][..4].try_into().unwrap());
+    assert_eq!(hash, crc32(id.as_bytes()), "weapon CRC32 name-hash");
+
+    // The inventory item is granted, so the game keeps it equipped.
+    let inv = layout::weapon_inventory_offset(slot.region(), family, tier).unwrap();
+    assert_eq!(d[inv + 2], 1, "weapon owned in inventory");
+    assert!(d[inv] >= 1, "weapon count covers the wielding unit");
+
+    // The deployed-formation copy (if this unit is deployed) mirrors the id.
+    if let Some(fbase) = layout::formation_base(slot.region()) {
+        for j in 0..layout::ROSTER_CAPACITY {
+            let rec = fbase + j * STRIDE;
+            if rec + STRIDE > d.len() {
+                break;
+            }
+            let rec_gid = u32::from_le_bytes(d[rec + GID..][..4].try_into().unwrap());
+            if &d[rec + UNIT_ID..][..4] == b"unit" && rec_gid == gid {
+                let end = d[rec + WEAPON_ID..][..16]
+                    .iter()
+                    .position(|&b| b == 0)
+                    .unwrap_or(16);
+                assert_eq!(
+                    &d[rec + WEAPON_ID..][..end],
+                    id.as_bytes(),
+                    "formation copy mirrors the weapon"
+                );
+            }
+        }
+    }
+
+    fs::remove_dir_all(&root).ok();
+    eprintln!("set_weapon round-tripped: id + CRC32, inventory grant, formation mirror");
+}

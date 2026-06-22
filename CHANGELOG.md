@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   value shown in the save list. Play time is not stored in the game data — only as this
   `PARAM.SFO` label — so the edit changes the displayed value (the game regenerates the
   label on its next save). `info` now shows the parsed play time.
+- `set-weapon` command (and `SaveSlot::unit_weapon` / `set_unit_weapon`): set a unit's
+  weapon tier within its class's weapon family (`max` picks the best — the Divine weapon,
+  or Gong's Scythe for Tatepon). Writes the weapon id and its CRC32 name-hash, mirrors the
+  deployed-formation copy, and **grants** the weapon in inventory so it stays equipped —
+  the game reverts an un-owned weapon to the family's basic weapon on load (confirmed on
+  hardware). `units` now shows each unit's weapon.
 
 ### Changed
 
