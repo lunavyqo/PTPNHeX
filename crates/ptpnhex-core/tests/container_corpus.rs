@@ -705,9 +705,18 @@ fn bonus_patapon_minigame_played_matches_corpus_and_toggles() {
 #[test]
 fn army_roster_reads_and_rarepon_round_trips() {
     // Reads the roster of a progressed save, checks every unit has a known class
-    // and rarepon code, and round-trips set_unit_rarepon on a working copy (no
-    // hardcoded anchor, so it is robust to the live corpus drifting).
+    // and rarepon code, and round-trips the full set_unit_rarepon recipe on a
+    // working copy (no hardcoded anchor, so it is robust to corpus drift).
     use ptpnhex_core::save::Rarepon;
+    // Record-relative offsets (mirror of save::layout) verified by this test.
+    const ROSTER_BASE: usize = 0x20;
+    const STRIDE: usize = 0x104;
+    const NAME_CLASS: usize = 0x4E;
+    const HEAD_ID: usize = 0xA4;
+    const HEAD_HASH: usize = 0xC4;
+    const HEAD_FLAG: usize = 0xC8;
+    const HEAD_ECHO: usize = 0xD0;
+
     let Some(dir) = saves_dir() else {
         eprintln!("skipped: set PTPNHEX_SAVES_DIR");
         return;
@@ -715,7 +724,7 @@ fn army_roster_reads_and_rarepon_round_trips() {
     let root = temp_root("rarepon");
     let work = working_copy(&dir.join("UCES00995_DATA46"), &root);
 
-    {
+    let (target, dekapon) = {
         let slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
         let n = slot.army_size();
         assert!(n > 0, "a progressed save should have units");
@@ -728,17 +737,62 @@ fn army_roster_reads_and_rarepon_round_trips() {
         }
         // Past the army, slots are empty.
         assert!(slot.unit_class(n).is_none(), "slot after the army is empty");
+        let target = (0..n)
+            .find(|&i| slot.unit_class(i) != Some("Dekapon"))
+            .expect("a non-Dekapon unit to build on");
+        let dekapon = (0..n).find(|&i| slot.unit_class(i) == Some("Dekapon"));
+        (target, dekapon)
+    };
+
+    // Basic (revert) is refused; Dekapon (unmapped headpieces) is refused.
+    {
+        let mut slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        let basic = Rarepon::from_slug("basic").unwrap();
+        assert!(
+            slot.set_unit_rarepon(target, basic).is_err(),
+            "Basic refused"
+        );
+        if let Some(d) = dekapon {
+            let barsala = Rarepon::from_slug("barsala").unwrap();
+            assert!(
+                slot.set_unit_rarepon(d, barsala).is_err(),
+                "Dekapon refused"
+            );
+        }
     }
 
-    // Round-trip: set unit 0 to each known rarepon through disk and read it back.
-    for rarepon in Rarepon::all() {
+    // Round-trip every real rarepon through disk; verify the full identity lands.
+    for rarepon in Rarepon::all().filter(|r| !r.is_basic()) {
         let mut slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
-        slot.set_unit_rarepon(0, rarepon).unwrap();
+        slot.set_unit_rarepon(target, rarepon).unwrap();
         slot.save().unwrap();
         let slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
-        assert_eq!(slot.unit_rarepon(0), Some(rarepon));
-        assert_eq!(slot.unit_rarepon_code(0), Some(rarepon.code()));
+        assert_eq!(slot.unit_rarepon(target), Some(rarepon));
+        assert_eq!(slot.unit_rarepon_code(target), Some(rarepon.code()));
+
+        let base = ROSTER_BASE + target * STRIDE;
+        let d = slot.data();
+        assert_eq!(
+            d[base + NAME_CLASS] & 0x0F,
+            rarepon.name_nibble(),
+            "{} name nibble",
+            rarepon.slug()
+        );
+        let id = rarepon.head_id().unwrap();
+        assert_eq!(&d[base + HEAD_ID..][..id.len()], id.as_bytes(), "head id");
+        assert_eq!(d[base + HEAD_ID + id.len()], 0, "head id NUL-terminated");
+        assert_eq!(
+            u32::from_le_bytes(d[base + HEAD_HASH..][..4].try_into().unwrap()),
+            rarepon.head_hash().unwrap(),
+            "head hash"
+        );
+        assert_eq!(d[base + HEAD_FLAG], 0x01, "headpiece flag");
+        assert_eq!(
+            d[base + HEAD_ECHO],
+            rarepon.head_echo().unwrap(),
+            "head echo"
+        );
     }
     fs::remove_dir_all(&root).ok();
-    eprintln!("army roster read and rarepon set/get round-tripped through disk");
+    eprintln!("army roster read and full rarepon recipe round-tripped through disk");
 }

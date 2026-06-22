@@ -133,15 +133,42 @@ pub const ROSTER_STRIDE: usize = 0x104;
 pub const ROSTER_CAPACITY: usize = 123;
 /// Record-relative offset of a unit's class id (`unitNNN_…` ASCII).
 pub const RECORD_UNIT_ID: usize = 0x50;
-/// Record-relative offset of the rarepon id (`u32` LE — see
-/// [`rarepon`](crate::save::rarepon)).
+/// Record-relative offset of the rarepon body code (`u32` LE — see
+/// [`rarepon`](crate::save::rarepon)): appearance and derived stats.
 pub const RECORD_RAREPON: usize = 0x48;
+/// Record-relative offset of a unit's global id (`u32` LE), stable across the
+/// roster and the deployed-formation copy; used to pair the two.
+pub const RECORD_GID: usize = 0x24;
+/// Record-relative offset of the packed rarepon name/class byte: the **high
+/// nibble** is the displayed class, the **low nibble** the displayed rarepon name.
+pub const RECORD_NAME_CLASS: usize = 0x4E;
+/// Record-relative offset of the headpiece id string (`hlmNNN_NN`).
+pub const RECORD_HEAD_ID: usize = 0xA4;
+/// Record-relative offset of the headpiece id's name-hash (`u32` LE).
+pub const RECORD_HEAD_HASH: usize = 0xC4;
+/// Record-relative offset of the headpiece flag: `0x01` = an intrinsic rarepon
+/// headpiece (no helmet slot); `0x00` = a basic patapon with an equippable helmet.
+pub const RECORD_HEAD_FLAG: usize = 0xC8;
+/// Record-relative offset of the headpiece numeric echo (`160 + hlm#`).
+pub const RECORD_HEAD_ECHO: usize = 0xD0;
 
 /// Byte offset of unit record `index` for `region`, if that index is within the
 /// roster capacity.
 pub fn roster_record_offset(region: Region, index: usize) -> Option<usize> {
     match region {
         Region::Europe => (index < ROSTER_CAPACITY).then(|| ROSTER_BASE + index * ROSTER_STRIDE),
+        Region::NorthAmerica | Region::Japan => None,
+    }
+}
+
+/// Base offset of the deployed-formation copy: a second array of the same
+/// `0x104`-byte unit records (a subset of the roster, re-grouped by class), each
+/// pairing back to its roster record by [`RECORD_GID`]. Editing a unit's rarepon
+/// must update its formation copy too, or the deployed unit keeps the old values.
+/// Confirmed stable at `0x30878` for Europe across the corpus.
+pub fn formation_base(region: Region) -> Option<usize> {
+    match region {
+        Region::Europe => Some(0x30878),
         Region::NorthAmerica | Region::Japan => None,
     }
 }

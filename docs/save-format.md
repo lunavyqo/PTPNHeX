@@ -58,12 +58,12 @@ record-relative offsets, each preceded by a 4-byte hash:
 | `+0x00` | a name slot (`none` when unnamed) |
 | `+0x50` | `unitNNN_01_01` — the class |
 | `+0x74` | `wpnNNN_III_VV` / `rwpnNNN_III_VV` — equipped weapon (or rare weapon) |
-| `+0xA4` | `hlmNNN_II` — equipped helmet |
+| `+0xA4` | `hlmNNN_NN` — headpiece (on a rarepon) or equipped helmet (on a basic) |
 | `+0xD4` | `sldNNN_II` — equipped shield (shield units only) |
 
 ```
-unit002_01_01   wpn001_008_01   hlm014_01          (a Yaripon + spear + helmet)
-unit003_01_01   rwpn003_009_01  hlm015_01  sld008_01 (a Tatepon + rare weapon + shield)
+unit002_01_01   wpn001_008_01   hlm014_01          (a Mogyoon Yumipon: bow + Mogyoon headpiece)
+unit003_01_01   rwpn003_009_01  hlm015_01  sld008_01 (a Barsala Tatepon: rare weapon + shield)
 ```
 
 The `NNN` in a class id selects the unit type, identified by the weapon family it
@@ -71,11 +71,11 @@ carries:
 
 | class id | weapon | unit |
 | --- | --- | --- |
-| `unit002` | `wpn001` (spears) | Yaripon |
-| `unit003` | `rwpn003` + `sld` | Tatepon |
-| `unit004` | `wpn004` (bows) | Yumipon |
-| `unit006` | `wpn006` | Kibapon |
-| `unit007` | `wpn007` (hammers) | Dekapon |
+| `unit002` | `wpn001` (bows) | Yumipon |
+| `unit003` | `rwpn003` + `sld` (swords/axes) | Tatepon |
+| `unit004` | `wpn004` (spears) | Yaripon |
+| `unit006` | `wpn006` (cavalry) | Kibapon |
+| `unit007` | `wpn007` (maces) | Dekapon |
 | `unit008` | `wpn008` (horns) | Megapon |
 
 The equipped-gear ids reuse the **same family/index taxonomy as the inventory
@@ -83,53 +83,60 @@ armory** — `wpn001_008` is the spear family, item 8 (the eighth spear catalogu
 under *Items*) — so units and the armory share one item-id space. Between the
 identifiers each record also holds numeric fields (unit level and stats); those
 are not yet individually decoded. (One field nearby, the `u32` at `+0xC4`, is the
-**name-hash of the equipped helmet** — `hlm015`→`0xDA216E8F`, `hlm014`→`0x629D09EA`,
-and so on — not a unit attribute.)
+**name-hash of the `+0xA4` headpiece/helmet** — `hlm015`→`0xDA216E8F`,
+`hlm014`→`0x629D09EA`, and so on — see *Rarepon* below.)
 
-#### Rarepon (the `u32` at `+0x48`)
+#### Rarepon
 
-The `u32` at record offset `+0x48` (just before the class id) is the unit's
-**rarepon** — the special variant that sets its body/appearance. It was confirmed
-on hardware in both directions: writing another rarepon's code makes the body
-change to that rarepon (working across every class), and recreating the unit as a
-plain Barsala reverts the code. Each value is a 32-bit name-hash (the high byte is
-always `0xFF`); the codes are shared across classes, so the same value is the same
-rarepon whether on a Yaripon, a Megapon, or any other unit:
+A unit's **rarepon** — the special variant that sets its identity — is stored
+**entirely in the unit record**, across a small set of fields that are all editable.
+This was confirmed on hardware by *constructing* a rarepon: writing the fields below
+onto a plain basic unit produced an in-game unit **indistinguishable from a
+naturally-created rarepon** — correct name, class, stats, headpiece, and the absent
+helmet slot. (Earlier notes that a rarepon's name and stats were "computed at birth
+and cached, not editable" were wrong; there is no external cache.)
 
-| code (`u32` LE) | rarepon |
+| field | meaning |
 | --- | --- |
-| `0xFFCDFEBE` | Barsala |
-| `0xFFC06E9F` | Mogyoon |
-| `0xFFA96D65` | Tikulee |
-| `0xFFF898CF` | Mofeel |
-| `0xFF356EEF` | Pyokola |
-| `0xFF61E4DA` | Gekolos |
-| `0xFFFFFFFF` | none / basic |
+| `+0x48` `u32` LE | **body** — the appearance, and the **stats** derived from it at runtime |
+| `+0x4E` byte | **high nibble = displayed class**, **low nibble = displayed name** |
+| `+0xA4` string | **headpiece** id (`hlmNNN_NN`) |
+| `+0xC4` `u32` LE | headpiece name-hash |
+| `+0xC8` byte | `0x01` = intrinsic headpiece (no helmet slot); `0x00` = basic, with a helmet slot |
+| `+0xD0` byte | numeric echo, `160 + head number` |
 
-Editing this field changes the unit's **body** appearance. The **headpiece** is a
-**separate, also-editable** pair of fields — the `hlm` id string at `+0xA4` and its
-name-hash at `+0xC4`: writing another rarepon's head id and hash puts that head on
-an otherwise-unchanged body (confirmed on hardware). The head ids run `hlm010`–
-`hlm015` for Pyokola / Gekolos / Mofeel / Tikulee / Mogyoon / Barsala (`hlm001` for
-basic); on a rarepon this `hlm` field is its **headpiece, not an equipped helmet**
-(rarepons have no helmet slot). A packed per-unit field at `+0x4c` must be kept
-consistent for an edited head to render. So a unit's **body and head are both
-editable**, including hybrids the game cannot normally make.
+The **body** code is a 32-bit name-hash (high byte always `0xFF`), shared across
+classes. The body drives appearance *and* stats — the game computes the rarepon's
+power from it on load, so there is no separate stored stat block (units of different
+rarepons read identical "stat" bytes). Each rarepon's full data:
 
-The rarepon's displayed **name and base stats**, however, are **computed when the
-unit is created and cached** into its record — they are *not* re-derived on load, so
-a unit keeps its original name and stats even after its body and head are changed.
-Neither `+0x4c` nor the `+0xd0` echo (which equals `160 + the head number`) controls
-them — both were tested on hardware and changing them alone did nothing. Where the
-name/stats cache lives is not yet mapped, so a *full* identity swap (name + stats) is
-not yet possible, though body and head are.
+| rarepon | body (`+0x48`) | headpiece | head-hash (`+0xC4`) | echo (`+0xD0`) | name nibble (`+0x4E`) |
+| --- | --- | --- | --- | --- | --- |
+| Barsala | `0xFFCDFEBE` | `hlm015_01` | `0xDA216E8F` | `0xAF` | `0xF` |
+| Mogyoon | `0xFFC06E9F` | `hlm014_01` | `0x629D09EA` | `0xAE` | `0xB` |
+| Tikulee | `0xFFA96D65` | `hlm013_01` | `0xFF4A3153` | `0xAD` | `0x7` |
+| Mofeel  | `0xFFF898CF` | `hlm012_01` | `0x47F65636` | `0xAC` | `0x3` |
+| Pyokola | `0xFF356EEF` | `hlm010_01` | `0xEDFF9EBD` | `0xAA` | `0x1` |
+| Gekolos | `0xFF61E4DA` | `hlm011_01` | `0x5543F9D8` | `0xAB` | `0x2` |
+| basic   | `0xFFFFFFFF` | `hlm001_NN` | — | `0xA1` | `0x0` |
 
-A second, **smaller** set of unit records appears near `0x30000`. It is **not** a
-copy of the roster: it holds verbatim copies of *some* unit records but in a
-different order and count (on the endgame save, 27 roster records versus 21 here,
-with a different class composition), so it is most likely the **deployed
-battle-formation** arrangement rather than a backup. Its exact layout is not yet
-mapped.
+The **name** comes from the low nibble of `+0x4E` — it is *not* derived from the
+body, so the body and the name nibble must be set **together** or the unit shows one
+rarepon's body with another's name. The **high nibble** of `+0x4E` is the displayed
+class (Yumipon `0`, Tatepon `1`/`2`, Yaripon `3`, Kibapon `4`, Dekapon `5`, Megapon
+`7`); an editor preserves the unit's own class nibble and changes only the name
+nibble. Some rarepons have more than one valid name nibble (recipe variants that
+display the same name); the values above are taken from naturally-created units.
+
+Two limitations of the standard headpieces above: **Dekapon** uses a different,
+not-yet-mapped headpiece family (`hlm007…`), and reverting a unit to **basic**
+requires a class-specific basic head and restoring the helmet slot — so neither is
+constructible yet.
+
+A unit also has a copy in the **deployed-formation** array near `0x30000` (a second
+block of the same `0x104`-byte records, a re-grouped subset of the roster, paired to
+each roster record by the global id at `+0x24`). Editing a rarepon must update that
+copy too, or the deployed unit keeps the old identity in battle.
 
 ## Confirmed fields
 

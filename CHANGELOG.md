@@ -17,20 +17,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `PARAM.SFO` label — so the edit changes the displayed value (the game regenerates the
   label on its next save). `info` now shows the parsed play time.
 
+### Changed
+
+- `set-rarepon` now writes a unit's **whole** rarepon identity — body, name/class byte
+  (`+0x4E`), headpiece id/hash/flag (`+0xA4`/`+0xC4`/`+0xC8`), and numeric echo (`+0xD0`) —
+  and mirrors it into the unit's deployed-formation copy, instead of only the body. Confirmed
+  on hardware by constructing a rarepon on a basic unit: name, class, stats, headpiece, and
+  the absent helmet slot all matched a naturally-created one. Reverting a unit to **basic**
+  and editing **Dekapon** units are rejected for now (their headpieces are not yet mapped).
+
 ### Documentation
 
-- Updated the rarepon section of `docs/save-format.md`: a unit's **headpiece** is a
-  separate, also-editable pair of fields (the `hlm` id at `+0xA4` and its hash at `+0xC4`),
-  hardware-confirmed — so **body and head are both editable** (the `+0xA4` field is the
-  rarepon's headpiece, not an equipped helmet; rarepons have no helmet slot). The displayed
-  **name and base stats** are computed at the unit's creation and cached, so they don't
-  follow body/head edits, and their storage is still unmapped (a full identity swap isn't
-  possible yet). Supersedes the earlier "only the body is editable" note.
-- Corrected the rarepon section of `docs/save-format.md`: a unit's `+0x48` controls
-  **only its body**, not its name/head/stats. A hardware retest disproved the earlier
-  claim that the name/head/stats are "derived from" that id — they are a separate, as-yet
-  unmapped per-unit value (the nearby `+0xd0`, despite correlating with the rarepon, does
-  not control them either), so a full rarepon swap is not yet possible.
+- Rewrote the rarepon section of `docs/save-format.md`: a rarepon is stored **entirely in
+  the unit record** and is **fully editable** — body (`+0x48`, appearance and derived stats),
+  displayed name and class (the low and high nibbles of `+0x4E`), headpiece (`+0xA4` id,
+  `+0xC4` hash, `+0xC8` no-helmet-slot flag), and the `+0xD0` echo. Confirmed by constructing
+  a rarepon on a basic unit and reading it back in-game. This replaces the earlier,
+  superseded notes ("only the body is editable", then "body + head, but name/stats are an
+  unmapped cache") — there is no external cache; the name is the `+0x4E` low nibble, and the
+  stats are derived from the body at runtime. Includes the full per-rarepon table (body,
+  headpiece, hash, echo, name nibble) and the class-nibble map, and corrects the swapped
+  Yaripon/Yumipon class labels (`unit002` = Yumipon/bow, `unit004` = Yaripon/spear).
 
 - Documented two hardware-confirmed minigame mechanics in `docs/save-format.md`: the
   **minigame-played** flag also gates that minigame's **first-play intro dialogue**

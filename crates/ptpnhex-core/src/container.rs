@@ -565,7 +565,19 @@ impl SaveSlot {
             .and_then(crate::save::Rarepon::from_code)
     }
 
-    /// Sets unit `index`'s rarepon, writing its id at record offset `+0x48`.
+    /// Turns unit `index` into `rarepon`, writing the full identity — body,
+    /// name/class byte, headpiece (id, hash, flag, echo) — and mirroring it into
+    /// the unit's deployed-formation copy so the change holds in battle too.
+    ///
+    /// The unit keeps its own class: only the low nibble of the name/class byte
+    /// (the displayed name) is changed, and the headpiece is the standard one for
+    /// that rarepon. Stats follow the body and are applied by the game.
+    ///
+    /// # Errors
+    /// - the roster slot is empty;
+    /// - `rarepon` is [`Basic`](crate::save::Rarepon::is_basic) — reverting a unit
+    ///   to a plain patapon (class-specific basic head + helmet slot) is unmapped;
+    /// - the unit is a Dekapon, whose headpieces use a different, unmapped id set.
     pub fn set_unit_rarepon(&mut self, index: usize, rarepon: crate::save::Rarepon) -> Result<()> {
         let base = self.unit_record(index).ok_or_else(|| {
             Error::Unsupported(format!(
@@ -573,9 +585,72 @@ impl SaveSlot {
                 self.region.serial()
             ))
         })?;
-        let off = base + crate::save::layout::RECORD_RAREPON;
-        self.data[off..off + 4].copy_from_slice(&rarepon.code().to_le_bytes());
+        if rarepon.is_basic() {
+            return Err(Error::Unsupported(
+                "cannot set a unit to Basic (reverting a rarepon is not supported)".into(),
+            ));
+        }
+        // Dekapon headpieces use a different (unmapped) id family than the other
+        // classes, so its rarepon construction isn't supported yet.
+        if &self.data[base + crate::save::layout::RECORD_UNIT_ID..][..7] == b"unit007" {
+            return Err(Error::Unsupported(
+                "rarepon editing for Dekapon units is not yet supported".into(),
+            ));
+        }
+
+        let gid = u32::from_le_bytes(
+            self.data[base + crate::save::layout::RECORD_GID..][..4]
+                .try_into()
+                .expect("4 bytes"),
+        );
+        self.write_rarepon_fields(base, rarepon);
+
+        // Mirror onto the deployed-formation copy (best effort): the record(s)
+        // there sharing this unit's global id.
+        if let Some(fbase) = crate::save::layout::formation_base(self.region) {
+            let stride = crate::save::layout::ROSTER_STRIDE;
+            for j in 0..crate::save::layout::ROSTER_CAPACITY {
+                let rec = fbase + j * stride;
+                if rec + stride > self.data.len() {
+                    break;
+                }
+                let is_unit =
+                    &self.data[rec + crate::save::layout::RECORD_UNIT_ID..][..4] == b"unit";
+                let rec_gid = u32::from_le_bytes(
+                    self.data[rec + crate::save::layout::RECORD_GID..][..4]
+                        .try_into()
+                        .expect("4 bytes"),
+                );
+                if is_unit && rec_gid == gid {
+                    self.write_rarepon_fields(rec, rarepon);
+                }
+            }
+        }
         Ok(())
+    }
+
+    /// Writes a (non-basic) rarepon's identity fields into the record at `base`.
+    /// Shared by the roster record and its formation copy.
+    fn write_rarepon_fields(&mut self, base: usize, rarepon: crate::save::Rarepon) {
+        use crate::save::layout::{
+            RECORD_HEAD_ECHO, RECORD_HEAD_FLAG, RECORD_HEAD_HASH, RECORD_HEAD_ID,
+            RECORD_NAME_CLASS, RECORD_RAREPON,
+        };
+        // body (appearance + stats)
+        self.data[base + RECORD_RAREPON..][..4].copy_from_slice(&rarepon.code().to_le_bytes());
+        // name nibble (low), preserving the unit's class nibble (high)
+        let nc = base + RECORD_NAME_CLASS;
+        self.data[nc] = (self.data[nc] & 0xF0) | (rarepon.name_nibble() & 0x0F);
+        // headpiece id string + NUL terminator (ids are fixed-length, no spill)
+        let id = rarepon.head_id().expect("non-basic has a head id");
+        let hb = id.as_bytes();
+        self.data[base + RECORD_HEAD_ID..][..hb.len()].copy_from_slice(hb);
+        self.data[base + RECORD_HEAD_ID + hb.len()] = 0;
+        // headpiece hash, flag (intrinsic head / no helmet slot), numeric echo
+        self.data[base + RECORD_HEAD_HASH..][..4]
+            .copy_from_slice(&rarepon.head_hash().expect("non-basic").to_le_bytes());
+        self.data[base + RECORD_HEAD_FLAG] = 0x01;
+        self.data[base + RECORD_HEAD_ECHO] = rarepon.head_echo().expect("non-basic");
     }
 
     /// The byte offset of unit `index`'s record if the slot is filled (its class
