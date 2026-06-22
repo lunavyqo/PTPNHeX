@@ -1000,3 +1000,62 @@ fn set_shield_and_horse_round_trip_and_helmet_is_gated() {
         "shield + horse round-tripped (id + CRC32 + grant); helmet correctly gated to basic units"
     );
 }
+
+#[test]
+fn gear_up_maxes_all_gear_and_keeps_rarepons() {
+    let Some(dir) = saves_dir() else {
+        eprintln!("skipped: set PTPNHEX_SAVES_DIR");
+        return;
+    };
+    let root = temp_root("gearup");
+    let work = working_copy(&dir.join("UCES00995_DATA46"), &root);
+
+    // Snapshot each unit's rarepon identity before gearing up.
+    let before: Vec<Option<u32>> = {
+        let slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        (0..slot.army_size())
+            .map(|i| slot.unit_rarepon_code(i))
+            .collect()
+    };
+
+    let changed = {
+        let mut slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        let c = slot.max_army_gear();
+        slot.save().unwrap();
+        c
+    };
+    assert!(changed > 0, "geared up at least one unit");
+
+    let slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+    for (i, &rarepon_before) in before.iter().enumerate() {
+        let max = slot.unit_weapon_max_tier(i).unwrap();
+        let weapon = slot.unit_weapon(i).unwrap();
+        let tier: u8 = weapon.split('_').nth(1).unwrap().parse().unwrap();
+        assert_eq!(tier, max, "unit {i} weapon at family max");
+
+        if slot.unit_class(i) == Some("Tatepon") {
+            assert_eq!(
+                slot.unit_shield(i),
+                Some("sld008_01"),
+                "unit {i} shield maxed"
+            );
+        }
+        if slot.unit_class(i) == Some("Kibapon") {
+            assert_eq!(
+                slot.unit_horse(i),
+                Some("hlm008_06"),
+                "unit {i} mount maxed"
+            );
+        }
+
+        // Rarepon identity must be untouched.
+        assert_eq!(
+            slot.unit_rarepon_code(i),
+            rarepon_before,
+            "unit {i} rarepon identity unchanged"
+        );
+    }
+
+    fs::remove_dir_all(&root).ok();
+    eprintln!("gear_up maxed every unit's gear and left rarepon identities unchanged");
+}

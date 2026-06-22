@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   basic patapon's helmet by tier (`max` = the Divine item). Same mechanism as `set-weapon`
   (id + CRC32 hash, formation mirror, inventory grant). A rarepon has no helmet slot — its
   `+0xA4` is the intrinsic headpiece (edit it with `set-rarepon`), so `set-helmet` rejects it.
+- `gear-up` command (and `SaveSlot::max_army_gear`): max every unit's gear in one call —
+  weapon, and each class's shield / mount / helmet — granting the items. Rarepon identities
+  are left unchanged (there is no objective "best" rarepon).
 
 ### Changed
 

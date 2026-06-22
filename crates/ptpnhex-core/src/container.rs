@@ -943,6 +943,30 @@ impl SaveSlot {
         Ok(())
     }
 
+    /// Gears up the whole army to the top tier: every unit's weapon to its
+    /// family's best, plus each Tatepon's shield, Kibapon's mount, and basic
+    /// patapon's helmet — granting each item in inventory.
+    ///
+    /// **Rarepon identities are left untouched**: there is no objective "best"
+    /// rarepon (it is an appearance/role choice), so only the orderable gear
+    /// tiers are maxed. Returns the number of units whose gear changed.
+    pub fn max_army_gear(&mut self) -> usize {
+        let mut changed = 0;
+        for i in 0..self.army_size() {
+            let mut touched = false;
+            if let Some(max) = self.unit_weapon_max_tier(i) {
+                touched |= self.set_unit_weapon(i, max).is_ok();
+            }
+            // Each setter validates the class/slot and errors (a no-op here) when
+            // the unit can't wear that gear, so only the right units are touched.
+            touched |= self.set_unit_shield(i, 8).is_ok();
+            touched |= self.set_unit_horse(i, 8).is_ok();
+            touched |= self.set_unit_helmet(i, 8).is_ok();
+            changed += usize::from(touched);
+        }
+        changed
+    }
+
     /// The byte offset of unit `index`'s record if the slot is filled (its class
     /// id begins with `unit`), else `None`.
     fn unit_record(&self, index: usize) -> Option<usize> {

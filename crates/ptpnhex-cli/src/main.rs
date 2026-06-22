@@ -163,6 +163,16 @@ enum Command {
         #[arg(long, value_name = "DIR")]
         backup_dir: Option<PathBuf>,
     },
+    /// Max every unit's gear — weapon, and each class's shield / mount / helmet —
+    /// to the top tier, granting the items. Rarepon identities are left unchanged.
+    GearUp {
+        /// Path to the save directory.
+        dir: PathBuf,
+        /// Copy the original files into this directory before saving.
+        /// Must be outside the save directory.
+        #[arg(long, value_name = "DIR")]
+        backup_dir: Option<PathBuf>,
+    },
     /// Open or close the mission-prep loadout slots (miracle and stew, together).
     SetLoadoutSlots {
         /// Path to the save directory.
@@ -345,6 +355,7 @@ fn main() -> Result<()> {
             tier,
             backup_dir,
         } => set_gear(&dir, index, "helmet", &tier, backup_dir.as_deref()),
+        Command::GearUp { dir, backup_dir } => gear_up(&dir, backup_dir.as_deref()),
         Command::SetLoadoutSlots {
             dir,
             state,
@@ -724,6 +735,14 @@ fn set_gear(
     .to_owned();
     back_up_and_save(&s, backup_dir)?;
     println!("Unit {index}: {slot} set to {equipped} (tier {t})");
+    Ok(())
+}
+
+fn gear_up(dir: &Path, backup_dir: Option<&Path>) -> Result<()> {
+    let mut slot = open(dir)?;
+    let changed = slot.max_army_gear();
+    back_up_and_save(&slot, backup_dir)?;
+    println!("Geared up {changed} units to max tier (rarepons left unchanged).");
     Ok(())
 }
 
