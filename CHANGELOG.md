@@ -26,6 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the absent helmet slot all matched a naturally-created one. Reverting a unit to **basic**
   and editing **Dekapon** units are rejected for now (their headpieces are not yet mapped).
 
+### Fixed
+
+- `units` listing: corrected the swapped Yaripon/Yumipon class labels in `unit_class`
+  (`unit002` is **Yumipon** — bows; `unit004` is **Yaripon** — spears). The documentation
+  was already corrected; this aligns the code's output with it.
+
 ### Documentation
 
 - Rewrote the rarepon section of `docs/save-format.md`: a rarepon is stored **entirely in

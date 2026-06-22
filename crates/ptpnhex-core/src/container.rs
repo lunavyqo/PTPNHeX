@@ -844,9 +844,9 @@ fn find_file_row(list: &[u8], name: &str) -> Option<usize> {
 /// Maps a unit class id prefix (`unitNNN`) to its class name.
 fn unit_class_name(id: &[u8]) -> &'static str {
     match id {
-        b"unit002" => "Yaripon",
+        b"unit002" => "Yumipon",
         b"unit003" => "Tatepon",
-        b"unit004" => "Yumipon",
+        b"unit004" => "Yaripon",
         b"unit006" => "Kibapon",
         b"unit007" => "Dekapon",
         b"unit008" => "Megapon",
