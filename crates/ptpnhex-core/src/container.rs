@@ -759,6 +759,190 @@ impl SaveSlot {
             .copy_from_slice(&hash.to_le_bytes());
     }
 
+    /// Reads the NUL-terminated gear id at record-relative `id_off` for unit
+    /// `index`, or `None` if the slot is empty or blank.
+    fn gear_id(&self, index: usize, id_off: usize) -> Option<&str> {
+        let base = self.unit_record(index)?;
+        let bytes = &self.data[base + id_off..base + id_off + 16];
+        let end = bytes.iter().position(|&b| b == 0).unwrap_or(bytes.len());
+        let id = std::str::from_utf8(&bytes[..end]).ok()?;
+        id.as_bytes()
+            .first()
+            .is_some_and(u8::is_ascii_lowercase)
+            .then_some(id)
+    }
+
+    /// Writes a gear id (+ NUL) and its CRC32 name-hash at the record-relative
+    /// `id_off` / `hash_off` of the record at `base`.
+    fn write_gear(&mut self, base: usize, id_off: usize, hash_off: usize, id: &str) {
+        let bytes = id.as_bytes();
+        let off = base + id_off;
+        self.data[off..off + bytes.len()].copy_from_slice(bytes);
+        self.data[off + bytes.len()] = 0;
+        let hash = crate::save::weapon::crc32(bytes);
+        self.data[base + hash_off..][..4].copy_from_slice(&hash.to_le_bytes());
+    }
+
+    /// Sets a gear slot to `new_id`: writes the roster record at `base`, mirrors
+    /// every formation copy sharing the unit's global id, and raises the item's
+    /// inventory count at `inv` to cover every unit now wearing it in this slot.
+    fn set_gear(&mut self, base: usize, id_off: usize, hash_off: usize, new_id: &str, inv: usize) {
+        let gid = u32::from_le_bytes(
+            self.data[base + crate::save::layout::RECORD_GID..][..4]
+                .try_into()
+                .expect("4 bytes"),
+        );
+        self.write_gear(base, id_off, hash_off, new_id);
+        if let Some(fbase) = crate::save::layout::formation_base(self.region) {
+            let stride = crate::save::layout::ROSTER_STRIDE;
+            for j in 0..crate::save::layout::ROSTER_CAPACITY {
+                let rec = fbase + j * stride;
+                if rec + stride > self.data.len() {
+                    break;
+                }
+                let is_unit =
+                    &self.data[rec + crate::save::layout::RECORD_UNIT_ID..][..4] == b"unit";
+                let rec_gid = u32::from_le_bytes(
+                    self.data[rec + crate::save::layout::RECORD_GID..][..4]
+                        .try_into()
+                        .expect("4 bytes"),
+                );
+                if is_unit && rec_gid == gid {
+                    self.write_gear(rec, id_off, hash_off, new_id);
+                }
+            }
+        }
+        let wearing = (0..self.army_size())
+            .filter(|&i| self.gear_id(i, id_off) == Some(new_id))
+            .count() as u32;
+        let want = wearing.clamp(1, crate::save::items::ITEM_MAX);
+        let count = want
+            .max(self.inventory_count(inv))
+            .min(crate::save::items::ITEM_MAX) as u8;
+        self.set_inventory(inv, count);
+    }
+
+    /// The equipped shield id of unit `index` (`sldNNN_01`, Tatepon), or `None`.
+    pub fn unit_shield(&self, index: usize) -> Option<&str> {
+        self.gear_id(index, crate::save::layout::RECORD_SHIELD_ID)
+            .filter(|s| s.starts_with("sld"))
+    }
+
+    /// Sets a Tatepon's shield to `tier` (`1..=8`, `8` = Divine Shield), writing
+    /// the id and its CRC32 hash, mirroring the formation copy, and granting it in
+    /// inventory. Errors if the unit is not a Tatepon or the tier is out of range.
+    pub fn set_unit_shield(&mut self, index: usize, tier: u8) -> Result<()> {
+        use crate::save::layout;
+        let base = self
+            .unit_record(index)
+            .ok_or_else(|| Error::Unsupported(format!("no unit at roster index {index}")))?;
+        if &self.data[base + layout::RECORD_UNIT_ID..][..7] != b"unit003" {
+            return Err(Error::Unsupported(format!(
+                "unit {index} is not a Tatepon — only Tatepons carry shields"
+            )));
+        }
+        if !(1..=8).contains(&tier) {
+            return Err(Error::Unsupported(format!(
+                "shield tier {tier} out of range 1..=8"
+            )));
+        }
+        let id = format!("sld{tier:03}_01");
+        let inv = layout::shield_inventory_offset(self.region, tier)
+            .filter(|&o| o + 4 <= self.data.len())
+            .ok_or_else(|| Error::Unsupported("shields are not mapped for this region".into()))?;
+        self.set_gear(
+            base,
+            layout::RECORD_SHIELD_ID,
+            layout::RECORD_SHIELD_HASH,
+            &id,
+            inv,
+        );
+        Ok(())
+    }
+
+    /// The mount id of unit `index` (`hlmNNN_06`, Kibapon), or `None`.
+    pub fn unit_horse(&self, index: usize) -> Option<&str> {
+        self.gear_id(index, crate::save::layout::RECORD_SHIELD_ID)
+            .filter(|s| s.starts_with("hlm"))
+    }
+
+    /// Sets a Kibapon's mount to `tier` (`1..=8`, `8` = Divine Horse). See
+    /// [`set_unit_shield`](Self::set_unit_shield) for the write/grant mechanism.
+    pub fn set_unit_horse(&mut self, index: usize, tier: u8) -> Result<()> {
+        use crate::save::layout;
+        let base = self
+            .unit_record(index)
+            .ok_or_else(|| Error::Unsupported(format!("no unit at roster index {index}")))?;
+        if &self.data[base + layout::RECORD_UNIT_ID..][..7] != b"unit006" {
+            return Err(Error::Unsupported(format!(
+                "unit {index} is not a Kibapon — only Kibapons ride mounts"
+            )));
+        }
+        if !(1..=8).contains(&tier) {
+            return Err(Error::Unsupported(format!(
+                "horse tier {tier} out of range 1..=8"
+            )));
+        }
+        let id = format!("hlm{tier:03}_06");
+        let inv = layout::horse_inventory_offset(self.region, tier)
+            .filter(|&o| o + 4 <= self.data.len())
+            .ok_or_else(|| Error::Unsupported("mounts are not mapped for this region".into()))?;
+        self.set_gear(
+            base,
+            layout::RECORD_SHIELD_ID,
+            layout::RECORD_SHIELD_HASH,
+            &id,
+            inv,
+        );
+        Ok(())
+    }
+
+    /// The equipped helmet id of unit `index` (`hlmNNN_01`), or `None` if the
+    /// unit has no helmet slot (a rarepon wears an intrinsic headpiece instead).
+    pub fn unit_helmet(&self, index: usize) -> Option<&str> {
+        let base = self.unit_record(index)?;
+        if self.data[base + crate::save::layout::RECORD_HEAD_FLAG] != 0 {
+            return None;
+        }
+        self.gear_id(index, crate::save::layout::RECORD_HEAD_ID)
+            .filter(|s| s.starts_with("hlm"))
+    }
+
+    /// Sets a basic patapon's helmet to `tier` (`1..=8`, `8` = Divine Helm).
+    ///
+    /// Only a unit with a **helmet slot** can wear a helmet: a rarepon's `+0xA4`
+    /// is its intrinsic headpiece (change it with
+    /// [`set_unit_rarepon`](Self::set_unit_rarepon)), so this errors on a rarepon.
+    /// See [`set_unit_shield`](Self::set_unit_shield) for the write/grant mechanism.
+    pub fn set_unit_helmet(&mut self, index: usize, tier: u8) -> Result<()> {
+        use crate::save::layout;
+        let base = self
+            .unit_record(index)
+            .ok_or_else(|| Error::Unsupported(format!("no unit at roster index {index}")))?;
+        if self.data[base + layout::RECORD_HEAD_FLAG] != 0 {
+            return Err(Error::Unsupported(format!(
+                "unit {index} has no helmet slot — a rarepon wears a headpiece (use set-rarepon)"
+            )));
+        }
+        if !(1..=8).contains(&tier) {
+            return Err(Error::Unsupported(format!(
+                "helmet tier {tier} out of range 1..=8"
+            )));
+        }
+        let id = format!("hlm{tier:03}_01");
+        let inv = layout::helmet_inventory_offset(self.region, tier)
+            .filter(|&o| o + 4 <= self.data.len())
+            .ok_or_else(|| Error::Unsupported("helmets are not mapped for this region".into()))?;
+        self.set_gear(
+            base,
+            layout::RECORD_HEAD_ID,
+            layout::RECORD_HEAD_HASH,
+            &id,
+            inv,
+        );
+        Ok(())
+    }
+
     /// The byte offset of unit `index`'s record if the slot is filled (its class
     /// id begins with `unit`), else `None`.
     fn unit_record(&self, index: usize) -> Option<usize> {

@@ -904,3 +904,99 @@ fn set_weapon_round_trips_grants_and_mirrors() {
     fs::remove_dir_all(&root).ok();
     eprintln!("set_weapon round-tripped: id + CRC32, inventory grant, formation mirror");
 }
+
+#[test]
+fn set_shield_and_horse_round_trip_and_helmet_is_gated() {
+    use ptpnhex_core::save::layout;
+
+    const ROSTER_BASE: usize = 0x20;
+    const STRIDE: usize = 0x104;
+    const SHIELD_HASH: usize = 0xF4;
+
+    fn crc32(bytes: &[u8]) -> u32 {
+        let mut crc: u32 = 0xFFFF_FFFF;
+        for &b in bytes {
+            crc ^= b as u32;
+            for _ in 0..8 {
+                let mask = (crc & 1).wrapping_neg();
+                crc = (crc >> 1) ^ (0xEDB8_8320 & mask);
+            }
+        }
+        !crc
+    }
+
+    let Some(dir) = saves_dir() else {
+        eprintln!("skipped: set PTPNHEX_SAVES_DIR");
+        return;
+    };
+    let root = temp_root("gear");
+    let work = working_copy(&dir.join("UCES00995_DATA46"), &root);
+
+    let (tatepon, kibapon, rarepon) = {
+        let slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        let n = slot.army_size();
+        let t = (0..n)
+            .find(|&i| slot.unit_class(i) == Some("Tatepon"))
+            .expect("a Tatepon");
+        let k = (0..n)
+            .find(|&i| slot.unit_class(i) == Some("Kibapon"))
+            .expect("a Kibapon");
+        let r = (0..n)
+            .find(|&i| slot.unit_helmet(i).is_none())
+            .expect("a unit without a helmet slot (a rarepon)");
+        (t, k, r)
+    };
+
+    // Class/slot gating and range checks.
+    {
+        let mut slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        assert!(
+            slot.set_unit_shield(kibapon, 8).is_err(),
+            "shield refused on a non-Tatepon"
+        );
+        assert!(
+            slot.set_unit_horse(tatepon, 8).is_err(),
+            "horse refused on a non-Kibapon"
+        );
+        assert!(
+            slot.set_unit_helmet(rarepon, 8).is_err(),
+            "helmet refused on a rarepon (no helmet slot)"
+        );
+        assert!(slot.set_unit_shield(tatepon, 0).is_err(), "tier 0 refused");
+        assert!(slot.set_unit_shield(tatepon, 9).is_err(), "tier 9 refused");
+    }
+
+    // Max the shield and the mount; verify id + CRC32 + inventory grant through disk.
+    let mut slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+    slot.set_unit_shield(tatepon, 8).unwrap();
+    slot.set_unit_horse(kibapon, 8).unwrap();
+    slot.save().unwrap();
+
+    let slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+    let d = slot.data();
+
+    assert_eq!(slot.unit_shield(tatepon), Some("sld008_01"));
+    let sb = ROSTER_BASE + tatepon * STRIDE;
+    assert_eq!(
+        u32::from_le_bytes(d[sb + SHIELD_HASH..][..4].try_into().unwrap()),
+        crc32(b"sld008_01"),
+        "shield CRC32"
+    );
+    assert_eq!(
+        d[layout::shield_inventory_offset(slot.region(), 8).unwrap() + 2],
+        1,
+        "Divine Shield granted"
+    );
+
+    assert_eq!(slot.unit_horse(kibapon), Some("hlm008_06"));
+    assert_eq!(
+        d[layout::horse_inventory_offset(slot.region(), 8).unwrap() + 2],
+        1,
+        "Divine Horse granted"
+    );
+
+    fs::remove_dir_all(&root).ok();
+    eprintln!(
+        "shield + horse round-tripped (id + CRC32 + grant); helmet correctly gated to basic units"
+    );
+}

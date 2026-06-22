@@ -114,6 +114,23 @@ tier's record sits at `base + (tier - 1) * 4`:
 | `wpn007` (Dekapon) | `0x19F18` |
 | `wpn008` (Megapon) | `0x19F40` |
 
+The same mechanism covers the other gear slots — write the id + its CRC32 hash,
+mirror the formation copy, and grant the item (count ≥ the number of wearers):
+
+| slot | record field (hash) | id form | inventory base | who |
+| --- | --- | --- | --- | --- |
+| shield | `+0xD4` (`+0xF4`) | `sldTTT_01` | `0x19E78` | Tatepon |
+| mount (horse) | `+0xD4` (`+0xF4`) | `hlmTTT_06` | `0x19EF0` | Kibapon |
+| helmet | `+0xA4` (`+0xC4`) | `hlmTTT_01` | `0x19F68` | basic patapon |
+
+The `+0xD4` slot is shared — a shield (`sld`, Tatepon) or a mount (an `hlm…_06`,
+Kibapon). The helmet reuses the head field `+0xA4`, but only on a **basic** patapon
+(`+0xC8 = 0`); on a rarepon that field is the intrinsic headpiece (no helmet slot),
+so a helmet cannot be equipped there. Each block is the same fixed 4-byte-per-tier
+layout as weapons (`base + (tier-1)*4`), tiers 1–8 (8 = the Divine item); the helmet
+block continues past tier 8 into the animal helms (Scorpiton `025`, Spiderton `026`,
+Beetleton `027`). All bases verified against every equipped item in the corpus.
+
 #### Rarepon
 
 A unit's **rarepon** — the special variant that sets its identity — is stored

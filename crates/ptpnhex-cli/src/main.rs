@@ -123,6 +123,46 @@ enum Command {
         #[arg(long, value_name = "DIR")]
         backup_dir: Option<PathBuf>,
     },
+    /// Set a Tatepon's shield tier by its roster index (see `units`). Grants it.
+    SetShield {
+        /// Path to the save directory.
+        dir: PathBuf,
+        /// Roster index of the unit (from `units`).
+        index: usize,
+        /// Shield tier (1 = Wood … 8 = Divine), or `max`.
+        tier: String,
+        /// Copy the original files into this directory before saving.
+        /// Must be outside the save directory.
+        #[arg(long, value_name = "DIR")]
+        backup_dir: Option<PathBuf>,
+    },
+    /// Set a Kibapon's mount (horse) tier by its roster index (see `units`).
+    SetHorse {
+        /// Path to the save directory.
+        dir: PathBuf,
+        /// Roster index of the unit (from `units`).
+        index: usize,
+        /// Horse tier (1 = Horse … 8 = Divine Horse), or `max`.
+        tier: String,
+        /// Copy the original files into this directory before saving.
+        /// Must be outside the save directory.
+        #[arg(long, value_name = "DIR")]
+        backup_dir: Option<PathBuf>,
+    },
+    /// Set a basic patapon's helmet tier (a rarepon wears a headpiece — use
+    /// `set-rarepon`).
+    SetHelmet {
+        /// Path to the save directory.
+        dir: PathBuf,
+        /// Roster index of the unit (from `units`).
+        index: usize,
+        /// Helmet tier (1 = Wooden … 8 = Divine), or `max`.
+        tier: String,
+        /// Copy the original files into this directory before saving.
+        /// Must be outside the save directory.
+        #[arg(long, value_name = "DIR")]
+        backup_dir: Option<PathBuf>,
+    },
     /// Open or close the mission-prep loadout slots (miracle and stew, together).
     SetLoadoutSlots {
         /// Path to the save directory.
@@ -287,6 +327,24 @@ fn main() -> Result<()> {
             tier,
             backup_dir,
         } => set_weapon(&dir, index, &tier, backup_dir.as_deref()),
+        Command::SetShield {
+            dir,
+            index,
+            tier,
+            backup_dir,
+        } => set_gear(&dir, index, "shield", &tier, backup_dir.as_deref()),
+        Command::SetHorse {
+            dir,
+            index,
+            tier,
+            backup_dir,
+        } => set_gear(&dir, index, "horse", &tier, backup_dir.as_deref()),
+        Command::SetHelmet {
+            dir,
+            index,
+            tier,
+            backup_dir,
+        } => set_gear(&dir, index, "helmet", &tier, backup_dir.as_deref()),
         Command::SetLoadoutSlots {
             dir,
             state,
@@ -634,6 +692,38 @@ fn set_weapon(dir: &Path, index: usize, tier: &str, backup_dir: Option<&Path>) -
     let weapon = slot.unit_weapon(index).unwrap_or("?").to_owned();
     back_up_and_save(&slot, backup_dir)?;
     println!("Unit {index}: weapon set to {weapon} (tier {tier_num})");
+    Ok(())
+}
+
+fn set_gear(
+    dir: &Path,
+    index: usize,
+    slot: &str,
+    tier: &str,
+    backup_dir: Option<&Path>,
+) -> Result<()> {
+    let mut s = open(dir)?;
+    let t: u8 = if tier.eq_ignore_ascii_case("max") {
+        8
+    } else {
+        tier.parse()
+            .with_context(|| format!("{slot} tier must be a number (1..=8) or `max`"))?
+    };
+    match slot {
+        "shield" => s.set_unit_shield(index, t)?,
+        "horse" => s.set_unit_horse(index, t)?,
+        "helmet" => s.set_unit_helmet(index, t)?,
+        other => bail!("unknown gear slot `{other}`"),
+    }
+    let equipped = match slot {
+        "shield" => s.unit_shield(index),
+        "horse" => s.unit_horse(index),
+        _ => s.unit_helmet(index),
+    }
+    .unwrap_or("?")
+    .to_owned();
+    back_up_and_save(&s, backup_dir)?;
+    println!("Unit {index}: {slot} set to {equipped} (tier {t})");
     Ok(())
 }
 

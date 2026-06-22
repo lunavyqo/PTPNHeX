@@ -156,6 +156,11 @@ pub const RECORD_HEAD_ECHO: usize = 0xD0;
 pub const RECORD_WEAPON_ID: usize = 0x74;
 /// Record-relative offset of the equipped weapon id's name-hash (`u32` LE).
 pub const RECORD_WEAPON_HASH: usize = 0x94;
+/// Record-relative offset of the third gear-slot id string at `+0xD4`: a shield
+/// (`sldNNN_01`, Tatepon) or a mount (`hlmNNN_06`, Kibapon).
+pub const RECORD_SHIELD_ID: usize = 0xD4;
+/// Record-relative offset of the third gear-slot id's name-hash (`u32` LE).
+pub const RECORD_SHIELD_HASH: usize = 0xF4;
 
 /// Byte offset of unit record `index` for `region`, if that index is within the
 /// roster capacity.
@@ -199,6 +204,34 @@ pub fn weapon_inventory_offset(region: Region, family: u16, tier: u8) -> Option<
         _ => return None,
     };
     Some(base + (tier as usize - 1) * 4)
+}
+
+/// Inventory record offset of a shield, tier `tier` (1-based) — the Tatepon
+/// `+0xD4` slot (`sldNNN_01`). Verified against every equipped shield in the corpus.
+pub fn shield_inventory_offset(region: Region, tier: u8) -> Option<usize> {
+    eu_gear_inventory(region, 0x19E78, tier)
+}
+
+/// Inventory record offset of a mount, tier `tier` (1-based) — the Kibapon `+0xD4`
+/// slot (`hlmNNN_06`). Verified against every equipped mount in the corpus.
+pub fn horse_inventory_offset(region: Region, tier: u8) -> Option<usize> {
+    eu_gear_inventory(region, 0x19EF0, tier)
+}
+
+/// Inventory record offset of a helmet, tier `tier` (1-based) — the `+0xA4` head
+/// slot on a basic patapon (`hlmNNN_01`). Verified against every equipped helmet
+/// in the corpus (standard helms are tiers 1–8; animal helms are higher indices).
+pub fn helmet_inventory_offset(region: Region, tier: u8) -> Option<usize> {
+    eu_gear_inventory(region, 0x19F68, tier)
+}
+
+/// Shared body of the gear inventory-offset helpers: a fixed 4-byte-per-tier
+/// block from `base` (Europe only; unmapped regions return `None`).
+fn eu_gear_inventory(region: Region, base: usize, tier: u8) -> Option<usize> {
+    match region {
+        Region::Europe if tier >= 1 => Some(base + (tier as usize - 1) * 4),
+        _ => None,
+    }
 }
 
 /// Bit (within the byte at [`loadout_slots_offset`]) that opens the mission-prep

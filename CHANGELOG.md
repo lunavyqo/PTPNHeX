@@ -22,6 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   deployed-formation copy, and **grants** the weapon in inventory so it stays equipped —
   the game reverts an un-owned weapon to the family's basic weapon on load (confirmed on
   hardware). `units` now shows each unit's weapon.
+- `set-shield`, `set-horse`, and `set-helmet` commands (and `SaveSlot::set_unit_shield` /
+  `set_unit_horse` / `set_unit_helmet`): set a Tatepon's shield, a Kibapon's mount, or a
+  basic patapon's helmet by tier (`max` = the Divine item). Same mechanism as `set-weapon`
+  (id + CRC32 hash, formation mirror, inventory grant). A rarepon has no helmet slot — its
+  `+0xA4` is the intrinsic headpiece (edit it with `set-rarepon`), so `set-helmet` rejects it.
 
 ### Changed
 
