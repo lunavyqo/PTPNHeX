@@ -30,6 +30,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `gear-up` command (and `SaveSlot::max_army_gear`): max every unit's gear in one call —
   weapon, and each class's shield / mount / helmet — granting the items. Rarepon identities
   are left unchanged (there is no objective "best" rarepon).
+- `add-unit` command (and `SaveSlot::add_unit`): duplicate a unit by its roster index,
+  adding a copy with the same class, rarepon and gear. The save stores no per-class cap, so a
+  squad can be grown past the creation menu's limit; the new unit is minted in the
+  freshly-created state and its count-gated gear — weapon, shield/mount, and the rarepon
+  headpiece — is granted so it equips on load. Refused past **six** of a class: the deploy
+  screen is six columns wide and a seventh crashes it (confirmed on hardware). Also maps the
+  rarepon-headpiece inventory table (`0x19F8C`, indexed by head echo) and the army-count
+  field (`0x14`).
 
 ### Changed
 

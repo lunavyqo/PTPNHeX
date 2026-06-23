@@ -1059,3 +1059,105 @@ fn gear_up_maxes_all_gear_and_keeps_rarepons() {
     fs::remove_dir_all(&root).ok();
     eprintln!("gear_up maxed every unit's gear and left rarepon identities unchanged");
 }
+
+#[test]
+fn add_unit_duplicates_with_gear_and_headpiece_and_caps_at_six() {
+    use ptpnhex_core::save::layout;
+
+    const ROSTER_BASE: usize = 0x20;
+    const STRIDE: usize = 0x104;
+    const GID: usize = 0x24;
+    const GROUP: usize = 0x20;
+    const HEAD_ECHO: usize = 0xD0;
+
+    let Some(dir) = saves_dir() else {
+        eprintln!("skipped: set PTPNHEX_SAVES_DIR");
+        return;
+    };
+    let root = temp_root("addunit");
+    let work = working_copy(&dir.join("UCES00995_DATA46"), &root);
+
+    // A Dekapon is the strict case: its headpiece (hlm007_07) is count-gated, so
+    // a duplicate must grant it in inventory or render bald in game.
+    let (dek, head_inv, head_before, n_before) = {
+        let slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        let dek = (0..slot.army_size())
+            .find(|&i| slot.unit_class(i) == Some("Dekapon"))
+            .expect("DATA46 fields Dekapons");
+        let echo = slot.data()[ROSTER_BASE + dek * STRIDE + HEAD_ECHO];
+        let head_inv = layout::headpiece_inventory_offset(slot.region(), echo)
+            .expect("a Dekapon's headpiece is in the headpiece table");
+        (dek, head_inv, slot.data()[head_inv], slot.army_size())
+    };
+
+    let mut slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+    let new_idx = slot.add_unit(dek).unwrap();
+    assert_eq!(new_idx, n_before, "the duplicate appends after the army");
+    assert_eq!(slot.army_size(), n_before + 1, "army grew by one");
+    assert_eq!(slot.unit_class(new_idx), slot.unit_class(dek), "same class");
+    assert_eq!(
+        slot.unit_rarepon_code(new_idx),
+        slot.unit_rarepon_code(dek),
+        "same rarepon identity"
+    );
+
+    // Newborn state: group index == the fresh serial, counters zero, the per-gear
+    // indices unset — a duplicate equal to a game-created unit bar its identity.
+    {
+        let d = slot.data();
+        let nb = ROSTER_BASE + new_idx * STRIDE;
+        let serial = u32::from_le_bytes(d[nb + GID..][..4].try_into().unwrap());
+        let group = u32::from_le_bytes(d[nb + GROUP..][..4].try_into().unwrap());
+        assert_eq!(group, serial, "group index equals the new serial");
+        for off in layout::RECORD_NEWBORN_ZERO {
+            let v = u32::from_le_bytes(d[nb + off..][..4].try_into().unwrap());
+            assert_eq!(v, 0, "newborn counter at +{off:#x} is zero");
+        }
+        for off in layout::RECORD_NEWBORN_UNSET {
+            let v = u32::from_le_bytes(d[nb + off..][..4].try_into().unwrap());
+            assert_eq!(v, u32::MAX, "newborn gear index at +{off:#x} is unset");
+        }
+        assert_eq!(
+            d[head_inv],
+            head_before + 1,
+            "the count-gated headpiece is granted for the new wearer"
+        );
+    }
+
+    // Survives a re-encrypt / reopen from disk.
+    slot.save().unwrap();
+    {
+        let slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        assert_eq!(slot.army_size(), n_before + 1, "army size persisted");
+        assert_eq!(
+            slot.unit_class(new_idx),
+            Some("Dekapon"),
+            "Dekapon persisted"
+        );
+        assert_eq!(
+            slot.data()[head_inv],
+            head_before + 1,
+            "headpiece grant persisted"
+        );
+    }
+
+    // The squad caps at SQUAD_MAX: raise it to the cap, then a further add fails.
+    let mut slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+    while (0..slot.army_size())
+        .filter(|&i| slot.unit_class(i) == Some("Dekapon"))
+        .count()
+        < layout::SQUAD_MAX
+    {
+        slot.add_unit(dek).unwrap();
+    }
+    assert!(
+        slot.add_unit(dek).is_err(),
+        "a seventh unit of a class is refused (the deploy screen holds six)"
+    );
+
+    fs::remove_dir_all(&root).ok();
+    eprintln!(
+        "add_unit: duplicated a Dekapon with gear + headpiece grant, capped at {}",
+        layout::SQUAD_MAX
+    );
+}

@@ -967,6 +967,158 @@ impl SaveSlot {
         changed
     }
 
+    /// Duplicates the unit at `source` into a new roster slot, minted the way the
+    /// game mints a freshly created unit: a fresh global id, the activity
+    /// counters and per-gear indices in their newborn state, and the same class,
+    /// rarepon identity and equipped gear as the source. Every count-gated piece
+    /// — the weapon, a shield or mount, and the rarepon headpiece — is granted in
+    /// inventory so it equips on load rather than reverting. Returns the new
+    /// unit's roster index.
+    ///
+    /// This lets a squad exceed the size the game's creation menu allows: the
+    /// save stores no per-class cap, only the army-size header. The one real
+    /// limit is the deploy screen, six columns wide — so a class may field up to
+    /// [`SQUAD_MAX`](crate::save::layout::SQUAD_MAX); a seventh loads but crashes
+    /// the deploy screen, so it is refused.
+    ///
+    /// # Errors
+    /// - `source` is not a filled roster slot;
+    /// - the source's class already fields [`SQUAD_MAX`] units;
+    /// - the roster is full, or the region's roster layout is unmapped (US/JP).
+    pub fn add_unit(&mut self, source: usize) -> Result<usize> {
+        use crate::save::layout;
+        let sbase = self
+            .unit_record(source)
+            .ok_or_else(|| Error::Unsupported(format!("no unit at roster index {source}")))?;
+        let class = self
+            .unit_class_id(source)
+            .expect("source is a filled record");
+        let in_class = (0..self.army_size())
+            .filter(|&i| self.unit_class_id(i) == Some(class))
+            .count();
+        if in_class >= layout::SQUAD_MAX {
+            return Err(Error::Unsupported(format!(
+                "this class already fields {0} units — the deploy formation holds at most {0}",
+                layout::SQUAD_MAX
+            )));
+        }
+
+        let dst = self.army_size();
+        let dbase = layout::roster_record_offset(self.region, dst)
+            .filter(|&b| b + layout::ROSTER_STRIDE <= self.data.len())
+            .ok_or_else(|| Error::Unsupported("the army roster is full".into()))?;
+        let count_off = layout::army_count_offset(self.region)
+            .filter(|&o| o + 4 <= self.data.len())
+            .ok_or_else(|| Error::Unsupported("army layout is unmapped for this region".into()))?;
+
+        let new_gid = (0..dst)
+            .filter_map(|i| self.unit_record(i))
+            .map(|b| {
+                u32::from_le_bytes(
+                    self.data[b + layout::RECORD_GID..][..4]
+                        .try_into()
+                        .expect("4 bytes"),
+                )
+            })
+            .filter(|&g| g != u32::MAX)
+            .max()
+            .map_or(0, |m| m + 1);
+
+        // Copy the source record, then stamp the newborn state (the bytes an
+        // in-game creation writes): a fresh serial and matching group index,
+        // zeroed activity counters, and unset per-gear indices.
+        self.data
+            .copy_within(sbase..sbase + layout::ROSTER_STRIDE, dbase);
+        self.data[dbase + layout::RECORD_GROUP_INDEX..][..4]
+            .copy_from_slice(&new_gid.to_le_bytes());
+        self.data[dbase + layout::RECORD_GID..][..4].copy_from_slice(&new_gid.to_le_bytes());
+        for off in layout::RECORD_NEWBORN_ZERO {
+            self.data[dbase + off..][..4].copy_from_slice(&0u32.to_le_bytes());
+        }
+        for off in layout::RECORD_NEWBORN_UNSET {
+            self.data[dbase + off..][..4].copy_from_slice(&u32::MAX.to_le_bytes());
+        }
+
+        // The roster now has one more filled record; sync the header count.
+        let size = self.army_size() as u32;
+        self.data[count_off..][..4].copy_from_slice(&size.to_le_bytes());
+
+        // Grant the duplicate's count-gated gear so it equips instead of
+        // reverting to the basic item (the Dekapon's headpiece is gated too).
+        self.grant_equipped_gear(dst);
+        Ok(dst)
+    }
+
+    /// Raises the inventory count of every count-gated item unit `index` wears —
+    /// weapon, shield or mount, and the rarepon headpiece — to cover all current
+    /// wearers, so a freshly duplicated unit equips its gear on load.
+    fn grant_equipped_gear(&mut self, index: usize) {
+        use crate::save::layout;
+        if let Some(id) = self.unit_weapon(index).map(str::to_owned) {
+            if let Some((family, tier, _)) = crate::save::weapon::parse(&id) {
+                if let Some(inv) = layout::weapon_inventory_offset(self.region, family, tier)
+                    .filter(|&o| o + 4 <= self.data.len())
+                {
+                    let wearers = (0..self.army_size())
+                        .filter(|&i| self.unit_weapon(i) == Some(id.as_str()))
+                        .count() as u32;
+                    self.grant_count(inv, wearers);
+                }
+            }
+        }
+        if let Some(id) = self
+            .gear_id(index, layout::RECORD_SHIELD_ID)
+            .map(str::to_owned)
+        {
+            if let Some(inv) =
+                third_slot_inventory(self.region, &id).filter(|&o| o + 4 <= self.data.len())
+            {
+                let wearers = (0..self.army_size())
+                    .filter(|&i| self.gear_id(i, layout::RECORD_SHIELD_ID) == Some(id.as_str()))
+                    .count() as u32;
+                self.grant_count(inv, wearers);
+            }
+        }
+        // The rarepon headpiece lives in an echo-indexed inventory table. Most
+        // heads are intrinsic and ignore the count, but gear-class heads (the
+        // Dekapon's) are gated; `grant_count` never lowers an intrinsic head's count.
+        if let Some(base) = self.unit_record(index) {
+            let echo = self.data[base + layout::RECORD_HEAD_ECHO];
+            if let Some(inv) = layout::headpiece_inventory_offset(self.region, echo)
+                .filter(|&o| o + 4 <= self.data.len())
+            {
+                let head = self
+                    .gear_id(index, layout::RECORD_HEAD_ID)
+                    .map(str::to_owned);
+                let wearers = (0..self.army_size())
+                    .filter(|&i| self.gear_id(i, layout::RECORD_HEAD_ID) == head.as_deref())
+                    .count() as u32;
+                self.grant_count(inv, wearers);
+            }
+        }
+    }
+
+    /// Raises inventory slot `inv` to cover `wearers` (never below its current
+    /// count, never above [`ITEM_MAX`](crate::save::items::ITEM_MAX)), obtaining
+    /// the item if it was never owned.
+    fn grant_count(&mut self, inv: usize, wearers: u32) {
+        let want = wearers.clamp(1, crate::save::items::ITEM_MAX);
+        let count = want
+            .max(self.inventory_count(inv))
+            .min(crate::save::items::ITEM_MAX) as u8;
+        self.set_inventory(inv, count);
+    }
+
+    /// The 7-byte class id (`b"unitNNN"`) of unit `index`, or `None` if empty.
+    fn unit_class_id(&self, index: usize) -> Option<[u8; 7]> {
+        let base = self.unit_record(index)?;
+        Some(
+            self.data[base + crate::save::layout::RECORD_UNIT_ID..][..7]
+                .try_into()
+                .expect("7 bytes"),
+        )
+    }
+
     /// The byte offset of unit `index`'s record if the slot is filled (its class
     /// id begins with `unit`), else `None`.
     fn unit_record(&self, index: usize) -> Option<usize> {
@@ -1151,6 +1303,23 @@ fn find_file_row(list: &[u8], name: &str) -> Option<usize> {
             return Some(off);
         }
         off += FILE_ROW_LEN;
+    }
+    None
+}
+
+/// Inventory offset for a third-slot gear id — a `sldNNN_01` shield or a
+/// `hlmNNN_06` mount — or `None` if the id is neither (or the region is unmapped).
+fn third_slot_inventory(region: Region, id: &str) -> Option<usize> {
+    if let Some(rest) = id.strip_prefix("sld") {
+        let tier: u8 = rest.split('_').next()?.parse().ok()?;
+        return crate::save::layout::shield_inventory_offset(region, tier);
+    }
+    if let Some(rest) = id.strip_prefix("hlm") {
+        let mut parts = rest.split('_');
+        let tier: u8 = parts.next()?.parse().ok()?;
+        if parts.next() == Some("06") {
+            return crate::save::layout::horse_inventory_offset(region, tier);
+        }
     }
     None
 }

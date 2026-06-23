@@ -173,6 +173,22 @@ enum Command {
         #[arg(long, value_name = "DIR")]
         backup_dir: Option<PathBuf>,
     },
+    /// Duplicate a unit by its roster index (see `units`): adds a copy with the
+    /// same class, rarepon and gear, granting its gear and headpiece. Lets a
+    /// squad exceed the creation-menu cap, up to the deploy limit of 6 per class.
+    AddUnit {
+        /// Path to the save directory.
+        dir: PathBuf,
+        /// Roster index of the unit to duplicate (from `units`).
+        index: usize,
+        /// How many copies to add.
+        #[arg(default_value_t = 1)]
+        count: usize,
+        /// Copy the original files into this directory before saving.
+        /// Must be outside the save directory.
+        #[arg(long, value_name = "DIR")]
+        backup_dir: Option<PathBuf>,
+    },
     /// Open or close the mission-prep loadout slots (miracle and stew, together).
     SetLoadoutSlots {
         /// Path to the save directory.
@@ -356,6 +372,12 @@ fn main() -> Result<()> {
             backup_dir,
         } => set_gear(&dir, index, "helmet", &tier, backup_dir.as_deref()),
         Command::GearUp { dir, backup_dir } => gear_up(&dir, backup_dir.as_deref()),
+        Command::AddUnit {
+            dir,
+            index,
+            count,
+            backup_dir,
+        } => add_unit(&dir, index, count, backup_dir.as_deref()),
         Command::SetLoadoutSlots {
             dir,
             state,
@@ -743,6 +765,34 @@ fn gear_up(dir: &Path, backup_dir: Option<&Path>) -> Result<()> {
     let changed = slot.max_army_gear();
     back_up_and_save(&slot, backup_dir)?;
     println!("Geared up {changed} units to max tier (rarepons left unchanged).");
+    Ok(())
+}
+
+fn add_unit(dir: &Path, index: usize, count: usize, backup_dir: Option<&Path>) -> Result<()> {
+    let mut slot = open(dir)?;
+    let class = slot.unit_class(index).with_context(|| {
+        format!(
+            "no unit at roster index {index} (army has {} units; see `units`)",
+            slot.army_size()
+        )
+    })?;
+    let mut added = 0;
+    for _ in 0..count {
+        match slot.add_unit(index) {
+            Ok(_) => added += 1,
+            // The squad is full (or the roster is): stop, but keep what we added.
+            Err(e) if added > 0 => {
+                eprintln!("Stopped after {added}: {e}");
+                break;
+            }
+            Err(e) => return Err(e.into()),
+        }
+    }
+    back_up_and_save(&slot, backup_dir)?;
+    println!(
+        "Added {added} {class} unit(s); army is now {}.",
+        slot.army_size()
+    );
     Ok(())
 }
 

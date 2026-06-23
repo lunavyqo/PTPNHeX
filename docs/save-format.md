@@ -178,15 +178,45 @@ class (Yumipon `0`, Tatepon `1`/`2`, Yaripon `3`, Kibapon `4`, Dekapon `5`, Mega
 nibble. Some rarepons have more than one valid name nibble (recipe variants that
 display the same name); the values above are taken from naturally-created units.
 
-Two limitations of the standard headpieces above: **Dekapon** uses a different,
-not-yet-mapped headpiece family (`hlm007…`), and reverting a unit to **basic**
-requires a class-specific basic head and restoring the helmet slot — so neither is
-constructible yet.
+Two limitations of the standard headpieces above apply to **constructing** a rarepon
+identity on a unit (`set-rarepon`): **Dekapon** uses a different headpiece family
+(`hlm007_07`, a count-gated head — see the headpiece table under *Items*), and
+reverting a unit to **basic** requires a class-specific basic head and restoring the
+helmet slot — so neither identity is built from another rarepon yet. (*Duplicating* an
+existing unit of any class, Dekapon included, is supported; see *Adding units past the
+creation cap*.)
 
 A unit also has a copy in the **deployed-formation** array near `0x30000` (a second
 block of the same `0x104`-byte records, a re-grouped subset of the roster, paired to
 each roster record by the global id at `+0x24`). Editing a rarepon must update that
 copy too, or the deployed unit keeps the old identity in battle.
+
+#### Adding units past the creation cap
+
+The save stores **no per-class unit cap**. The game's creation menu enforces the
+familiar limits (6 Yumipon/Yaripon/Tatepon, 3 Kibapon/Dekapon/Megapon), but those are
+UI rules: the only army-size field is the `u32` at `0x14`, with no per-class tally
+anywhere. A class can therefore be grown past its creation cap by appending a record
+and bumping `0x14`. The one hard limit is the **battle formation — six columns wide**:
+up to **six** of *any* class deploys cleanly (confirmed on hardware — six Dekapons
+field fine), but a **seventh** loads and then crashes the deploy screen, so it must be
+avoided.
+
+A unit added this way is minted the way the game mints a freshly-created one — copy an
+existing unit's record (its class, rarepon identity and gear), then write the **newborn
+state**, so it behaves like a born unit rather than a stale clone:
+
+| field | newborn value |
+| --- | --- |
+| `+0x20` group index | the unit's new global id (`+0x24`) |
+| `+0x3C`, `+0x40` | `0` (activity counters) |
+| `+0x9C`, `+0xCC`, `+0xFC` | `0xFFFFFFFF` (per-gear "processed" indices, each 8 bytes past a gear hash; the game fills them later) |
+
+Finally, **grant every count-gated item the unit wears** (the same ownership gate as
+any gear — weapon, shield/mount, and, for a Dekapon, its headpiece; see *Weapons and
+gear* and the headpiece table under *Items*), or the unit reverts those slots to the
+basic item on load. With that, a duplicated unit is indistinguishable in game from a
+naturally-created one.
 
 ## Confirmed fields
 
@@ -502,8 +532,15 @@ from the community wiki rather than measured slot by slot.
   **horns** render misplaced (the model floats up-and-right). The two placeholder
   **shields** (`0x19E98`, `0x19E9C`) share the −1 HP signature with the textures
   `仮` and a white dot-circle.
-- **Unwearable helms** — `0x19F8C`–`0x19FA0` and `0x19FA8`–`0x19FC4` (14 slots) are
-  helm-icon placeholders that cannot be equipped.
+- **Rarepon headpieces** — `0x19F8C`–`0x19FC4` is the rarepon-headpiece table: one
+  4-byte record per head, indexed by the head **echo** (the unit's `+0xD0`,
+  `160 + hlm#`; slot `= 0x19F8C + (echo − 170) × 4`). Each count equals the number of
+  units wearing that headpiece (verified across the corpus). Most rarepon heads are
+  **intrinsic** — the count is informational and rendering ignores it — but a few
+  **gear-class** heads are count-gated like equipment, notably the **Dekapon's**
+  `hlm007_07` (echo `184`, at `0x19FC4`), whose count tracks the Dekapon count
+  exactly; a Dekapon without a spare here renders with a bald head. None of these can
+  be equipped as an ordinary helmet from the item menu.
 - **Removed items** — `0x19FD4`–`0x19FE4` are five **"(delete)"** helms (a distinct
   placeholder string for removed content).
 - **End of the table** — after `0x19FE8` (Meden), the slots `0x19FEC`–`0x1A0DC` are

@@ -131,6 +131,13 @@ pub const ROSTER_BASE: usize = 0x20;
 pub const ROSTER_STRIDE: usize = 0x104;
 /// Number of unit records the array reserves room for.
 pub const ROSTER_CAPACITY: usize = 123;
+/// The most units of one class the battle formation can field. The save stores
+/// no per-class cap — the game's creation menu enforces the usual 6/6/6/3/3/3 —
+/// but the deploy screen is six columns wide, so a squad may be raised to six of
+/// *any* class. A seventh loads and then crashes the deploy screen, so
+/// [`add_unit`](crate::SaveSlot::add_unit) refuses past this. Confirmed on
+/// hardware: six of every class fields fine; a seventh crashes.
+pub const SQUAD_MAX: usize = 6;
 /// Record-relative offset of a unit's class id (`unitNNN_…` ASCII).
 pub const RECORD_UNIT_ID: usize = 0x50;
 /// Record-relative offset of the rarepon body code (`u32` LE — see
@@ -139,6 +146,21 @@ pub const RECORD_RAREPON: usize = 0x48;
 /// Record-relative offset of a unit's global id (`u32` LE), stable across the
 /// roster and the deployed-formation copy; used to pair the two.
 pub const RECORD_GID: usize = 0x24;
+/// Record-relative offset of the deploy/formation group index (`u32` LE). A
+/// freshly created unit sets this equal to its [`RECORD_GID`]; the game rewrites
+/// it to a squad slot index when the unit is placed into a battle formation.
+pub const RECORD_GROUP_INDEX: usize = 0x20;
+/// Record-relative offsets a freshly *game-created* unit holds in its "newborn"
+/// state, captured from an in-game unit creation (see `docs/save-format.md`):
+/// two activity counters that start at `0`. Their precise role is undecoded, but
+/// matching them lets [`add_unit`](crate::SaveSlot::add_unit) write a duplicate
+/// that equals a born unit apart from its identity. See [`RECORD_NEWBORN_UNSET`].
+pub const RECORD_NEWBORN_ZERO: [usize; 2] = [0x3C, 0x40];
+/// Record-relative offsets that a freshly created unit leaves unset
+/// (`0xFFFFFFFF`): the three per-gear "processed" indices, each 8 bytes past a
+/// gear hash (weapon `+0x94`, head `+0xC4`, third slot `+0xF4`). The game fills
+/// them lazily once the unit is established. See [`RECORD_NEWBORN_ZERO`].
+pub const RECORD_NEWBORN_UNSET: [usize; 3] = [0x9C, 0xCC, 0xFC];
 /// Record-relative offset of the packed rarepon name/class byte: the **high
 /// nibble** is the displayed class, the **low nibble** the displayed rarepon name.
 pub const RECORD_NAME_CLASS: usize = 0x4E;
@@ -167,6 +189,16 @@ pub const RECORD_SHIELD_HASH: usize = 0xF4;
 pub fn roster_record_offset(region: Region, index: usize) -> Option<usize> {
     match region {
         Region::Europe => (index < ROSTER_CAPACITY).then(|| ROSTER_BASE + index * ROSTER_STRIDE),
+        Region::NorthAmerica | Region::Japan => None,
+    }
+}
+
+/// Offset of the army-size `u32` (the number of filled roster records) for
+/// `region`. The game reads this header field as the roster length, so adding a
+/// unit must bump it to match. Confirmed for Europe at `0x14`.
+pub fn army_count_offset(region: Region) -> Option<usize> {
+    match region {
+        Region::Europe => Some(0x14),
         Region::NorthAmerica | Region::Japan => None,
     }
 }
@@ -230,6 +262,21 @@ pub fn helmet_inventory_offset(region: Region, tier: u8) -> Option<usize> {
 fn eu_gear_inventory(region: Region, base: usize, tier: u8) -> Option<usize> {
     match region {
         Region::Europe if tier >= 1 => Some(base + (tier as usize - 1) * 4),
+        _ => None,
+    }
+}
+
+/// Inventory record offset of the rarepon headpiece identified by `echo` — a
+/// unit's [`RECORD_HEAD_ECHO`] value (`160 + hlm#`). Headpieces occupy a block
+/// of fixed 4-byte records indexed by echo from `170` (`0x19F8C`). Most rarepon
+/// heads are intrinsic and ignore this count, but gear-class heads — notably the
+/// Dekapon's `hlm007_07` (echo `184`) — are count-gated and revert to a bald
+/// head without a spare, so a duplicated unit's headpiece must be granted here.
+/// Verified against the corpus: each head's count equals the number of units
+/// wearing it.
+pub fn headpiece_inventory_offset(region: Region, echo: u8) -> Option<usize> {
+    match region {
+        Region::Europe if (170..=184).contains(&echo) => Some(0x19F8C + (echo as usize - 170) * 4),
         _ => None,
     }
 }
