@@ -7,3 +7,12 @@ SAVEDATA/
 
 # Backup files produced by the editor
 *.bak
+
+# Local working data — decrypted save corpus, key material, card backups. Never committed.
+.local-keys/
+
+# Scratch save fixtures for local integration testing.
+test-saves/
+
+# macOS Finder metadata.
+.DS_Store
