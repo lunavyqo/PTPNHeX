@@ -692,16 +692,69 @@ impl SaveSlot {
         let (family, _, variant) = crate::save::weapon::parse(current)
             .ok_or_else(|| Error::Unsupported(format!("unrecognised weapon id `{current}`")))?;
         let variant = variant.to_owned();
+        self.write_weapon_family(index, family, tier, &variant)
+    }
+
+    /// Sets unit `index`'s weapon to a **foreign** family — a weapon its class does not
+    /// natively wield (a horn on a Yumipon, a spear on a Tatepon, …). The unit keeps its
+    /// class's own attack *action*; the weapon supplies the *projectile* (for the ranged
+    /// classes — Yumipon shoots, Yaripon throws) and the stats, so e.g. a Yumipon holding a
+    /// horn fires the horn's blast. Writes the id with the canonical variant `01` (the form
+    /// every weapon uses in the corpus) and its CRC32 name-hash, mirrors the
+    /// deployed-formation copy, and grants the weapon so it stays equipped.
+    ///
+    /// Most cross-class weapons persist and function; a few do not survive the game's own
+    /// next save — notably a **Megapon** given a bow or sword, which the engine reverts to a
+    /// horn. This method writes the combination regardless; deciding whether to warn is left
+    /// to the caller (the CLI refuses those unless `--force`).
+    ///
+    /// # Errors
+    /// - the roster slot is empty, or the unit has no weapon;
+    /// - `family` is not a known weapon family, or `tier` is outside `1..=max` for it
+    ///   (8, or 9 for Tatepon swords);
+    /// - the region's weapon layout is unmapped.
+    pub fn set_unit_weapon_family(&mut self, index: usize, family: u16, tier: u8) -> Result<()> {
+        let current = self
+            .unit_weapon(index)
+            .ok_or_else(|| Error::Unsupported(format!("no weapon at roster index {index}")))?;
+        crate::save::weapon::parse(current)
+            .ok_or_else(|| Error::Unsupported(format!("unrecognised weapon id `{current}`")))?;
+        self.write_weapon_family(index, family, tier, "01")
+    }
+
+    /// Writes `wpn{family}_{tier}_{variant}` into unit `index`'s roster record and every
+    /// deployed-formation copy sharing its global id, then grants the weapon in inventory
+    /// (count ≥ the units now wielding it). Shared by
+    /// [`set_unit_weapon`](Self::set_unit_weapon) and
+    /// [`set_unit_weapon_family`](Self::set_unit_weapon_family).
+    fn write_weapon_family(
+        &mut self,
+        index: usize,
+        family: u16,
+        tier: u8,
+        variant: &str,
+    ) -> Result<()> {
         let max = crate::save::weapon::max_tier(family);
         if tier < 1 || tier > max {
             return Err(Error::Unsupported(format!(
                 "weapon tier {tier} out of range 1..={max} for family {family:03}"
             )));
         }
+        // Resolve (and validate) the inventory slot up front: an unknown family has no
+        // slot, so this rejects it before the record is touched.
+        let inv = crate::save::layout::weapon_inventory_offset(self.region, family, tier)
+            .filter(|&o| o + 4 <= self.data.len())
+            .ok_or_else(|| {
+                Error::Unsupported(format!(
+                    "weapon family {family:03} tier {tier} is unmapped for this region"
+                ))
+            })?;
         let new_id = format!("wpn{family:03}_{tier:03}_{variant}");
 
         // roster record, then every formation copy sharing this unit's global id
-        let base = self.unit_record(index).expect("checked by unit_weapon");
+        let base = self
+            .unit_record(index)
+            .ok_or_else(|| Error::Unsupported(format!("no unit at roster index {index}")))?;
         let gid = u32::from_le_bytes(
             self.data[base + crate::save::layout::RECORD_GID..][..4]
                 .try_into()
@@ -729,13 +782,6 @@ impl SaveSlot {
         }
 
         // grant: raise the weapon's inventory count to cover every unit wielding it
-        let inv = crate::save::layout::weapon_inventory_offset(self.region, family, tier)
-            .filter(|&o| o + 4 <= self.data.len())
-            .ok_or_else(|| {
-                Error::Unsupported(format!(
-                    "weapon inventory slot for family {family:03} tier {tier} is unmapped"
-                ))
-            })?;
         let wielding = (0..self.army_size())
             .filter(|&i| self.unit_weapon(i) == Some(new_id.as_str()))
             .count() as u32;

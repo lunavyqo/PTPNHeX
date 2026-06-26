@@ -118,6 +118,15 @@ enum Command {
         index: usize,
         /// Weapon tier (1 = basic … 8 = Divine; Tatepon swords reach 9), or `max`.
         tier: String,
+        /// Equip a FOREIGN weapon family instead of the unit's own: 1 bow, 3 sword,
+        /// 4 spear, 6 halberd, 7 hammer, 8 horn. The unit keeps its class's attack
+        /// action; the weapon supplies the projectile (for ranged classes) and stats.
+        #[arg(long, value_name = "FAMILY")]
+        family: Option<u16>,
+        /// Allow a cross-family combination the game reverts on its next save
+        /// (a Megapon given a bow or a sword).
+        #[arg(long)]
+        force: bool,
         /// Copy the original files into this directory before saving.
         /// Must be outside the save directory.
         #[arg(long, value_name = "DIR")]
@@ -351,8 +360,10 @@ fn main() -> Result<()> {
             dir,
             index,
             tier,
+            family,
+            force,
             backup_dir,
-        } => set_weapon(&dir, index, &tier, backup_dir.as_deref()),
+        } => set_weapon(&dir, index, &tier, family, force, backup_dir.as_deref()),
         Command::SetShield {
             dir,
             index,
@@ -707,25 +718,66 @@ fn set_rarepon(dir: &Path, index: usize, rarepon: &str, backup_dir: Option<&Path
     Ok(())
 }
 
-fn set_weapon(dir: &Path, index: usize, tier: &str, backup_dir: Option<&Path>) -> Result<()> {
+fn set_weapon(
+    dir: &Path,
+    index: usize,
+    tier: &str,
+    family: Option<u16>,
+    force: bool,
+    backup_dir: Option<&Path>,
+) -> Result<()> {
     let mut slot = open(dir)?;
-    let max = slot.unit_weapon_max_tier(index).with_context(|| {
-        format!(
-            "no weapon at roster index {index} (army has {} units; see `units`)",
-            slot.army_size()
-        )
-    })?;
+    let max = match family {
+        Some(f) => ptpnhex_core::save::weapon::max_tier(f),
+        None => slot.unit_weapon_max_tier(index).with_context(|| {
+            format!(
+                "no weapon at roster index {index} (army has {} units; see `units`)",
+                slot.army_size()
+            )
+        })?,
+    };
     let tier_num: u8 = if tier.eq_ignore_ascii_case("max") {
         max
     } else {
         tier.parse()
             .with_context(|| format!("weapon tier must be a number (1..={max}) or `max`"))?
     };
-    slot.set_unit_weapon(index, tier_num)?;
+    match family {
+        Some(f) => {
+            if !matches!(f, 1 | 3 | 4 | 6 | 7 | 8) {
+                anyhow::bail!(
+                    "weapon family {f} is unknown — use 1 bow, 3 sword, 4 spear, \
+                     6 halberd, 7 hammer, or 8 horn"
+                );
+            }
+            if !force && slot.unit_class(index) == Some("Megapon") && matches!(f, 1 | 3) {
+                anyhow::bail!(
+                    "a Megapon reverts a {} to its own horn when the game next saves — \
+                     pass --force to set it anyway",
+                    weapon_name(f)
+                );
+            }
+            slot.set_unit_weapon_family(index, f, tier_num)?;
+        }
+        None => slot.set_unit_weapon(index, tier_num)?,
+    }
     let weapon = slot.unit_weapon(index).unwrap_or("?").to_owned();
     back_up_and_save(&slot, backup_dir)?;
     println!("Unit {index}: weapon set to {weapon} (tier {tier_num})");
     Ok(())
+}
+
+/// Display name of a weapon family, for `set-weapon --family` messages.
+fn weapon_name(family: u16) -> &'static str {
+    match family {
+        1 => "bow",
+        3 => "sword",
+        4 => "spear",
+        6 => "halberd",
+        7 => "hammer",
+        8 => "horn",
+        _ => "weapon",
+    }
 }
 
 fn set_gear(

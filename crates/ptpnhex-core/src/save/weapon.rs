@@ -42,7 +42,7 @@ pub(crate) fn parse(id: &str) -> Option<(u16, u8, &str)> {
 
 /// The highest tier for a weapon family. Every family tops out at `8` (the
 /// Divine weapon); the Tatepon sword family (`003`) has a 9th, Gong's Scythe.
-pub(crate) fn max_tier(family: u16) -> u8 {
+pub fn max_tier(family: u16) -> u8 {
     if family == 3 {
         9
     } else {

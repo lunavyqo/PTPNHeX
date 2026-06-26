@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `set-weapon --family <F>`: equip a unit with a **foreign** weapon family (1 bow, 3 sword,
+  4 spear, 6 halberd, 7 hammer, 8 horn) instead of its own. The unit keeps its class's attack
+  *action* and the weapon supplies the *projectile* (for the ranged classes) and the stats —
+  e.g. a Yumipon with a horn fires the horn's blast. Grants the weapon and mirrors the
+  deployed-formation copy like the normal `set-weapon`; a Megapon given a bow or sword is
+  refused (the game reverts it to a horn on its next save) unless `--force`.
+  (`SaveSlot::set_unit_weapon_family`.)
 - `set-name` command (and `SaveSlot::player_name` / `set_player_name`): read and edit the
   player's "Almighty" name, stored as a UTF-16LE string at `0x1AEF4` in the game data so it
   persists in-game (unlike the regenerated save-list label). `info` now shows the name.

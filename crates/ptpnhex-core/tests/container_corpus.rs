@@ -921,6 +921,53 @@ fn set_weapon_round_trips_grants_and_mirrors() {
 }
 
 #[test]
+fn set_unit_weapon_family_equips_a_foreign_weapon() {
+    use ptpnhex_core::save::layout;
+
+    let Some(dir) = saves_dir() else {
+        eprintln!("skipped: set PTPNHEX_SAVES_DIR");
+        return;
+    };
+    let root = temp_root("crossweapon");
+    let work = working_copy(&dir.join("UCES00995_DATA46"), &root);
+
+    // A Yumipon natively wields a bow (wpn001); give it a horn (family 8, Divine).
+    let mut slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+    let yumipon = (0..slot.army_size())
+        .find(|&i| slot.unit_class(i) == Some("Yumipon"))
+        .expect("a Yumipon in DATA46");
+    slot.set_unit_weapon_family(yumipon, 8, 8).unwrap();
+    slot.save().unwrap();
+
+    let slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+    assert_eq!(
+        slot.unit_weapon(yumipon),
+        Some("wpn008_008_01"),
+        "the foreign horn is equipped and survives a save round trip"
+    );
+    let inv = layout::weapon_inventory_offset(slot.region(), 8, 8).unwrap();
+    assert_eq!(
+        slot.data()[inv + 2],
+        1,
+        "the horn is granted (owned) in inventory"
+    );
+
+    // An unknown family or an out-of-range tier is rejected.
+    let mut slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+    assert!(
+        slot.set_unit_weapon_family(yumipon, 99, 8).is_err(),
+        "unknown weapon family rejected"
+    );
+    assert!(
+        slot.set_unit_weapon_family(yumipon, 8, 99).is_err(),
+        "out-of-range tier rejected"
+    );
+
+    fs::remove_dir_all(&root).ok();
+    eprintln!("set_unit_weapon_family equipped a foreign horn on a Yumipon");
+}
+
+#[test]
 fn set_shield_and_horse_round_trip_and_helmet_is_gated() {
     use ptpnhex_core::save::layout;
 
