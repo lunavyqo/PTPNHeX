@@ -186,10 +186,11 @@ helmet slot — so neither identity is built from another rarepon yet. (*Duplica
 existing unit of any class, Dekapon included, is supported; see *Adding units past the
 creation cap*.)
 
-A unit also has a copy in the **deployed-formation** array near `0x30000` (a second
-block of the same `0x104`-byte records, a re-grouped subset of the roster, paired to
-each roster record by the global id at `+0x24`). Editing a rarepon must update that
-copy too, or the deployed unit keeps the old identity in battle.
+A unit also has a copy in the **deployed-formation** array (base `0x30670`, EU — a second
+block of the same `0x104`-byte records, a re-grouped subset of the roster, paired to each
+roster record by the global id at `+0x24`; slot 0 is an empty `none` marker, so the first
+*deployed* unit sits at `0x30774`). Editing a unit's gear or rarepon must update that copy
+too, or the deployed unit keeps the old values in battle.
 
 #### Adding units past the creation cap
 

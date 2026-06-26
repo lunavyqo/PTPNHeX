@@ -901,6 +901,21 @@ fn set_weapon_round_trips_grants_and_mirrors() {
         }
     }
 
+    // Regression: `formation_base` must be the true START of the deployed array. The
+    // first deployed unit is in the first filled slot; if the base is even one record
+    // too high (it was, at 0x30878), that unit's battle copy is silently skipped and it
+    // fights with stale gear. Assert that no formation slot precedes the base — i.e. the
+    // preceding record is neither a unit nor an empty `none` slot.
+    if let Some(fbase) = layout::formation_base(slot.region()) {
+        let prev = fbase - STRIDE;
+        let precedes_unit = &d[prev + UNIT_ID..][..4] == b"unit";
+        let precedes_empty = &d[prev..][..4] == b"none";
+        assert!(
+            !precedes_unit && !precedes_empty,
+            "formation_base {fbase:#x} is not the array start: a deployed slot sits at {prev:#x}"
+        );
+    }
+
     fs::remove_dir_all(&root).ok();
     eprintln!("set_weapon round-tripped: id + CRC32, inventory grant, formation mirror");
 }

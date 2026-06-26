@@ -203,14 +203,19 @@ pub fn army_count_offset(region: Region) -> Option<usize> {
     }
 }
 
-/// Base offset of the deployed-formation copy: a second array of the same
-/// `0x104`-byte unit records (a subset of the roster, re-grouped by class), each
-/// pairing back to its roster record by [`RECORD_GID`]. Editing a unit's rarepon
-/// must update its formation copy too, or the deployed unit keeps the old values.
-/// Confirmed stable at `0x30878` for Europe across the corpus.
+/// Base offset of the deployed-formation array: a second block of the same
+/// `0x104`-byte unit records (a re-grouped subset of the roster), each pairing back
+/// to its roster record by [`RECORD_GID`]. Editing a unit's gear or rarepon must
+/// update its formation copy too, or the deployed unit keeps the old values in battle.
+///
+/// The array starts at `0x30670` for Europe: slot 0 is an empty `none` marker and the
+/// first *deployed* unit sits at `0x30774`. Confirmed across the corpus by GID-pairing
+/// every filled slot. (An earlier value of `0x30878` was two records too high — one
+/// empty slot plus the first deployed unit — so that first deployed unit's battle copy
+/// was never mirrored and it kept its old gear in battle.)
 pub fn formation_base(region: Region) -> Option<usize> {
     match region {
-        Region::Europe => Some(0x30878),
+        Region::Europe => Some(0x30670),
         Region::NorthAmerica | Region::Japan => None,
     }
 }

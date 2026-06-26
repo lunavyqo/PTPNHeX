@@ -50,6 +50,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Deployed-formation array base was off by two records (`0x30878` → `0x30670`): the **first
+  deployed unit**'s in-battle copy was never mirrored, so `set-weapon`,
+  `set-shield`/`-horse`/`-helmet`, `gear-up`, and `set-rarepon` left that one unit fighting
+  with its old gear. The base now points at the true start of the array (slot 0, an empty
+  marker), covering every deployed unit.
 - `units` listing: corrected the swapped Yaripon/Yumipon class labels in `unit_class`
   (`unit002` is **Yumipon** — bows; `unit004` is **Yaripon** — spears). The documentation
   was already corrected; this aligns the code's output with it.
