@@ -143,8 +143,10 @@ pub const RECORD_UNIT_ID: usize = 0x50;
 /// Record-relative offset of the rarepon body code (`u32` LE — see
 /// [`rarepon`](crate::save::rarepon)): appearance and derived stats.
 pub const RECORD_RAREPON: usize = 0x48;
-/// Record-relative offset of a unit's global id (`u32` LE), stable across the
-/// roster and the deployed-formation copy; used to pair the two.
+/// Record-relative offset of a unit's global id (`u32` LE): it pairs a roster record
+/// with its deployed-formation copy. It is *positional*, though — equal to the roster
+/// index, and the game re-stamps every unit's id to `0..N` on each save — so it is not a
+/// durable identity across a game re-save; track army state by content, not by this id.
 pub const RECORD_GID: usize = 0x24;
 /// Record-relative offset of the deploy/formation group index (`u32` LE). A
 /// freshly created unit sets this equal to its [`RECORD_GID`]; the game rewrites

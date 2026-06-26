@@ -131,6 +131,31 @@ layout as weapons (`base + (tier-1)*4`), tiers 1–8 (8 = the Divine item); the 
 block continues past tier 8 into the animal helms (Scorpiton `025`, Spiderton `026`,
 Beetleton `027`). All bases verified against every equipped item in the corpus.
 
+##### Cross-class weapons (in-game behaviour)
+
+A weapon's `wpnFFF` family is **freely editable** — any unit can be given any family's id,
+not only its own (the editor exposes this as `set-weapon --family`). The whole 6×6
+class×family grid was confirmed on a real PSP, and the rule is simple:
+
+> **The host class fixes the attack *action*; the equipped weapon supplies the *projectile*
+> and the stats (including reach).**
+
+- **Delivery follows the class.** Yumipon *shoots*, Yaripon *throws*, Tatepon / Kibapon /
+  Dekapon *melee*, Megapon does its *horn-blast* — whatever weapon is held.
+- **Projectile follows the weapon.** Bow → arrows, spear → spears, horn → horn-blast (the
+  *projectile* families); sword, halberd and hammer are *melee* and carry no projectile. So a
+  ranged class fires the held weapon's projectile (a Yumipon with a horn fires the horn's
+  blast; a Yaripon with a bow throws arrows), a ranged class holding a melee weapon fires
+  *nothing* (point-blank damage only), and a melee class always melees — the weapon only
+  changes reach/stats/sound, never adding a projectile (the horn *sound* plays for a Tatepon
+  or Dekapon but not for a mounted Kibapon).
+- **Stats and reach transfer**, so a cross-class weapon is a real gameplay change, not a
+  reskin — strongest for a ranged class given a heavier projectile (Yumipon/Yaripon + horn).
+- **Megapon is the exception:** it always performs its horn attack, and when *fielded* the
+  game reverts a bow (`wpn001`) or sword (`wpn003`) on a Megapon back to a horn on its next
+  save (other families, e.g. a spear, are kept). A foreign weapon is only re-validated when
+  the unit is **deployed**, so a benched cross-weapon persists unchecked.
+
 #### Rarepon
 
 A unit's **rarepon** — the special variant that sets its identity — is stored
@@ -191,6 +216,12 @@ block of the same `0x104`-byte records, a re-grouped subset of the roster, paire
 roster record by the global id at `+0x24`; slot 0 is an empty `none` marker, so the first
 *deployed* unit sits at `0x30774`). Editing a unit's gear or rarepon must update that copy
 too, or the deployed unit keeps the old values in battle.
+
+The **global id (`+0x24`)** pairs a roster record with its formation copy, but it is *not* a
+durable identity: in practice it equals the record's roster index, and the game **re-stamps
+every unit's `+0x24` to `0..N` whenever it saves**. So a unit's id changes when the game
+re-writes the file — compare army state by **content / class**, never by record index across
+a game re-save.
 
 #### Adding units past the creation cap
 
