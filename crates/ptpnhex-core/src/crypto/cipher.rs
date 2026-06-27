@@ -6,11 +6,13 @@ use crate::{Error, Result};
 /// Length of the per-save header prepended to an encrypted `SECURE.BIN`.
 pub const SECURE_HEADER_LEN: usize = 16;
 
-const KEY19CC: Block = [
-    0x70, 0x44, 0xA3, 0xAE, 0xEF, 0x5D, 0xA5, 0xF2, 0x85, 0x7F, 0xF2, 0xD6, 0x94, 0xF5, 0x36, 0x3B,
-];
-const KEY19DC: Block = [
+/// Fixed mask XORed into the seed before the keyslot-`0x12` decrypt.
+const SEED_PRE_XOR: Block = [
     0xEC, 0x6D, 0x29, 0x59, 0x26, 0x35, 0xA5, 0x7F, 0x97, 0x2A, 0x0D, 0xBC, 0xA3, 0x26, 0x33, 0x00,
+];
+/// Fixed mask XORed into the seed after the keyslot-`0x12` decrypt.
+const SEED_POST_XOR: Block = [
+    0x70, 0x44, 0xA3, 0xAE, 0xEF, 0x5D, 0xA5, 0xF2, 0x85, 0x7F, 0xF2, 0xD6, 0x94, 0xF5, 0x36, 0x3B,
 ];
 
 /// Derives the keystream for a body of `aligned_len` bytes (a multiple of 16)
@@ -18,10 +20,10 @@ const KEY19DC: Block = [
 fn keystream(header: &Block, gamekey: &Block, aligned_len: usize) -> Vec<u8> {
     let mut seed = *header;
     kirk::xor(&mut seed, gamekey);
-    kirk::xor(&mut seed, &KEY19DC);
+    kirk::xor(&mut seed, &SEED_PRE_XOR);
     let decrypted = kirk::aes_cbc_decrypt_zero_iv(&slot::K12, &seed);
     let mut seed: Block = decrypted.try_into().expect("single block");
-    kirk::xor(&mut seed, &KEY19CC);
+    kirk::xor(&mut seed, &SEED_POST_XOR);
 
     let mut counters = Vec::with_capacity(aligned_len);
     for k in 0..(aligned_len / 16) as u32 {

@@ -60,14 +60,15 @@ mode-5 paths:
 | `0x12` | `5DC71139D01938BC027FDDDCB0837D9D` | cipher key derivation|
 | `0x64` | `03B302E85FF381B13B8DAA2A90FF5E61` | cipher keystream     |
 
-`sceChnnlsv` mixing constants:
+`sceChnnlsv` mixing constants (the `firmware` column is the address each lives
+at, kept for cross-reference):
 
-| name      | value                              |
-| --------- | ---------------------------------- |
-| `key19CC` | `7044A3AEEF5DA5F2857FF2D694F5363B` |
-| `key19DC` | `EC6D29592635A57F972A0DBCA3263300` |
-| `hash198C`| `FAAA50EC2FDE5493AD14B2CEA53005DF` |
-| `hash19BC`| `CB15F407F96A523C04B9B2EE5C53FA86` |
+| name            | firmware | value                              |
+| --------------- | -------- | ---------------------------------- |
+| `SEED_POST_XOR` | `0x19CC` | `7044A3AEEF5DA5F2857FF2D694F5363B` |
+| `SEED_PRE_XOR`  | `0x19DC` | `EC6D29592635A57F972A0DBCA3263300` |
+| `HASH_XOR_MASK` | `0x19BC` | `CB15F407F96A523C04B9B2EE5C53FA86` |
+| (modes 3/4)     | `0x198C` | `FAAA50EC2FDE5493AD14B2CEA53005DF` |
 
 ## The cipher (mode 5)
 
@@ -80,7 +81,7 @@ IV.
 1. Split off the leading 16-byte header: `header = blob[0..16]`, `body =
    blob[16..]`. Zero-pad `body` to a multiple of 16 (`alen`).
 2. `crypted = header XOR gamekey`.
-3. `seed = AES_dec(slot_0x12, crypted XOR key19DC) XOR key19CC`.
+3. `seed = AES_dec(slot_0x12, crypted XOR SEED_PRE_XOR) XOR SEED_POST_XOR`.
 4. Build the counter blocks: for block index `k = 0..alen/16-1`,
    `C[k] = seed[0..12] ‖ u32_le(k + 1)`.
 5. `keystream = AES_dec(slot_0x64, C[0]‖C[1]‖…)` (continuous CBC, zero IV).
@@ -103,7 +104,7 @@ mixing in the game key:
 
 ```
 h = AES_CMAC(slot_0x10, padded_secure_bin)
-h = h XOR hash19BC
+h = h XOR HASH_XOR_MASK
 file_hash = AES_enc(slot_0x10, gamekey XOR h)
 ```
 
@@ -113,14 +114,15 @@ Computed over the **entire `PARAM.SFO`** (4912 bytes, already 16-aligned) with
 the target hash field zeroed, in this order. Each is an AES-CMAC with a
 slot/constant chosen by mode:
 
-| offset | mode | slot   | post-XOR   | notes                     |
-| ------ | ---- | ------ | ---------- | ------------------------- |
-| `+0x20`| 6    | `0x11` | `hash19BC` | computed first            |
-| `+0x70`| 5    | `0x10` | `hash19BC` | computed second           |
-| `+0x10`| 1    | `0x03` | none       | computed last             |
+| offset | mode | slot   | post-XOR        | notes           |
+| ------ | ---- | ------ | --------------- | --------------- |
+| `+0x20`| 6    | `0x11` | `HASH_XOR_MASK` | computed first  |
+| `+0x70`| 5    | `0x10` | `HASH_XOR_MASK` | computed second |
+| `+0x10`| 1    | `0x03` | none            | computed last   |
 
 The order matters: each hash is computed while the later fields are still
-present and earlier ones already written. (modes 3/4 would post-XOR `hash198C`.)
+present and earlier ones already written. (modes 3/4 would post-XOR the constant
+at `0x198C`.)
 
 ### The mode-6 limitation
 

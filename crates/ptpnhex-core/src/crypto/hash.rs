@@ -2,7 +2,8 @@
 
 use super::kirk::{self, slot, Block};
 
-const HASH19BC: Block = [
+/// Fixed mask XORed into the AES-CMAC result during hash derivation.
+const HASH_XOR_MASK: Block = [
     0xCB, 0x15, 0xF4, 0x07, 0xF9, 0x6A, 0x52, 0x3C, 0x04, 0xB9, 0xB2, 0xEE, 0x5C, 0x53, 0xFA, 0x86,
 ];
 
@@ -14,7 +15,7 @@ pub fn file_list_hash(secure_bin: &[u8], gamekey: &Block) -> Block {
     data.resize(aligned_len, 0);
 
     let mut h = kirk::aes_cmac(&slot::K10, &data);
-    kirk::xor(&mut h, &HASH19BC);
+    kirk::xor(&mut h, &HASH_XOR_MASK);
     let mut mixed = *gamekey;
     kirk::xor(&mut mixed, &h);
     kirk::aes_encrypt_block(&slot::K10, &mut mixed);
@@ -43,7 +44,7 @@ pub fn params_hash(param_sfo: &[u8], field: ParamsHashField) -> Block {
         ParamsHashField::Hash10 => kirk::aes_cmac(&slot::K03, param_sfo),
         ParamsHashField::Hash70 => {
             let mut h = kirk::aes_cmac(&slot::K10, param_sfo);
-            kirk::xor(&mut h, &HASH19BC);
+            kirk::xor(&mut h, &HASH_XOR_MASK);
             h
         }
     }
