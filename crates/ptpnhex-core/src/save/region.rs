@@ -9,9 +9,9 @@
 pub enum Region {
     /// Europe, `UCES00995`.
     Europe,
-    /// North America, `UCUS98632`.
+    /// North America, `UCUS98711`.
     NorthAmerica,
-    /// Japan, `UCJS10047`.
+    /// Japan, `UCJS10077`.
     Japan,
 }
 
@@ -21,8 +21,8 @@ impl Region {
     pub fn from_serial(serial: &str) -> Option<Self> {
         match serial {
             "UCES00995" => Some(Region::Europe),
-            "UCUS98632" => Some(Region::NorthAmerica),
-            "UCJS10047" => Some(Region::Japan),
+            "UCUS98711" => Some(Region::NorthAmerica),
+            "UCJS10077" => Some(Region::Japan),
             _ => None,
         }
     }
@@ -40,8 +40,8 @@ impl Region {
     pub fn serial(self) -> &'static str {
         match self {
             Region::Europe => "UCES00995",
-            Region::NorthAmerica => "UCUS98632",
-            Region::Japan => "UCJS10047",
+            Region::NorthAmerica => "UCUS98711",
+            Region::Japan => "UCJS10077",
         }
     }
 }

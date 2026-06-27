@@ -65,6 +65,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `units` listing: corrected the swapped Yaripon/Yumipon class labels in `unit_class`
   (`unit002` is **Yumipon** — bows; `unit004` is **Yaripon** — spears). The documentation
   was already corrected; this aligns the code's output with it.
+- Corrected the placeholder North America and Japan region serials, which named the wrong
+  discs (`UCUS98632` is Patapon 2; `UCJS10047`/`UCJS10054` are unrelated titles). They are
+  now `UCUS98711` (NA) and `UCJS10077` (JP); both regions remain unsupported pending their
+  game keys and layout work.
 
 ### Documentation
 

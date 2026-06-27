@@ -23,10 +23,10 @@ const EUROPE: Option<GameKey> = Some([
     0x01, 0xAF, 0x6F, 0x00, 0x02, 0x00, 0x70, 0xD5, 0x2E, 0x24, 0x12, 0xC7, 0xE1, 0xFF, 0x83, 0xBA,
 ]);
 
-/// North America (`UCUS98632`). Pending.
+/// North America (`UCUS98711`). Pending.
 const NORTH_AMERICA: Option<GameKey> = None;
 
-/// Japan (`UCJS10047`). Pending.
+/// Japan (`UCJS10077`). Pending.
 const JAPAN: Option<GameKey> = None;
 
 /// Returns the embedded game key for `region`, if one is known.
