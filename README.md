@@ -10,20 +10,26 @@ inspect and edit its contents, and write it back in a form the game accepts.
 
 ## Status
 
-Early development. Nothing is usable yet.
+A working command-line editor for the European release (`UCES00995`), validated
+on real PSP hardware. No binary release is tagged yet — build it from source
+(below). A desktop GUI and support for the US and Japan releases are planned.
 
-| Region | Serial      | Status  |
-| ------ | ----------- | ------- |
-| EU     | `UCES00995` | planned |
-| US     | `UCUS98623` | later   |
-| JP     | `UCJS10054` | later   |
+| Region | Serial      | Status      |
+| ------ | ----------- | ----------- |
+| EU     | `UCES00995` | supported   |
+| US     | `UCUS98711` | planned     |
+| JP     | `UCJS10077` | planned     |
 
-## Planned features
+## Features
 
-- Decrypt and re-encrypt `SECURE.BIN` save data with correct `PARAM.SFO` hash updates
-- Edit money (ka-ching), materials, items and equipment, army composition, mission progress, and miracles
-- `ptpnhex` command-line interface and a cross-platform desktop GUI
-- Optional backups of the originals to a directory you choose
+- Decrypts and re-encrypts `SECURE.BIN` save data with correct `PARAM.SFO` hash updates
+- Edits money (ka-ching), crafting materials, the item and equipment catalog, the army
+  roster and unit rarepons, mission and unlock progress, and the altar's key items
+  (drums, miracles, songs)
+- `ptpnhex` command-line interface, with optional backups of the originals to a directory
+  you choose
+
+Planned: a cross-platform desktop GUI, and support for the US and Japan releases.
 
 ## Installation
 
