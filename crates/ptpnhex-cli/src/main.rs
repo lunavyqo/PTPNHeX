@@ -109,6 +109,21 @@ enum Command {
         #[arg(long, value_name = "DIR")]
         backup_dir: Option<PathBuf>,
     },
+    /// Set a unit's class by its roster index (see `units`). Changes only the
+    /// functional class id; the unit keeps its weapon, rarepon and gear (a
+    /// hybrid), and the in-game result is not yet hardware-verified.
+    SetClass {
+        /// Path to the save directory.
+        dir: PathBuf,
+        /// Roster index of the unit (from `units`).
+        index: usize,
+        /// Target class: Yumipon, Tatepon, Yaripon, Kibapon, Dekapon, or Megapon.
+        class: String,
+        /// Copy the original files into this directory before saving.
+        /// Must be outside the save directory.
+        #[arg(long, value_name = "DIR")]
+        backup_dir: Option<PathBuf>,
+    },
     /// Set a unit's weapon tier by its roster index (see `units`). Grants the
     /// weapon in inventory so it stays equipped.
     SetWeapon {
@@ -356,6 +371,12 @@ fn main() -> Result<()> {
             rarepon,
             backup_dir,
         } => set_rarepon(&dir, index, &rarepon, backup_dir.as_deref()),
+        Command::SetClass {
+            dir,
+            index,
+            class,
+            backup_dir,
+        } => set_class(&dir, index, &class, backup_dir.as_deref()),
         Command::SetWeapon {
             dir,
             index,
@@ -715,6 +736,24 @@ fn set_rarepon(dir: &Path, index: usize, rarepon: &str, backup_dir: Option<&Path
     slot.set_unit_rarepon(index, r)?;
     back_up_and_save(&slot, backup_dir)?;
     println!("Unit {index}: rarepon set to {}", r.name());
+    Ok(())
+}
+
+fn set_class(dir: &Path, index: usize, class: &str, backup_dir: Option<&Path>) -> Result<()> {
+    let mut slot = open(dir)?;
+    let from = slot
+        .unit_class(index)
+        .map(|s| s.to_string())
+        .with_context(|| {
+            format!(
+                "no unit at roster index {index} (army has {} units; see `units`)",
+                slot.army_size()
+            )
+        })?;
+    slot.set_unit_class(index, class)?;
+    let to = slot.unit_class(index).unwrap_or("?");
+    back_up_and_save(&slot, backup_dir)?;
+    println!("Unit {index}: class {from} -> {to} (weapon/rarepon/gear unchanged — a hybrid)");
     Ok(())
 }
 

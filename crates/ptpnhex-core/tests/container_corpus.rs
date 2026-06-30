@@ -921,6 +921,95 @@ fn set_weapon_round_trips_grants_and_mirrors() {
 }
 
 #[test]
+fn set_unit_class_reclasses_and_mirrors() {
+    use ptpnhex_core::save::layout;
+
+    const ROSTER_BASE: usize = 0x20;
+    const STRIDE: usize = 0x104;
+    const UNIT_ID: usize = 0x50;
+    const GID: usize = 0x24;
+
+    let Some(dir) = saves_dir() else {
+        eprintln!("skipped: set PTPNHEX_SAVES_DIR");
+        return;
+    };
+    let root = temp_root("class");
+    let work = working_copy(&dir.join("UCES00995_DATA46"), &root);
+
+    // A filled unit, and a target class different from its current one.
+    let (target, from, to) = {
+        let slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        let i = (0..slot.army_size())
+            .find(|&i| slot.unit_class(i).is_some())
+            .expect("a filled unit");
+        let from = slot.unit_class(i).unwrap().to_owned();
+        let to = if from == "Tatepon" {
+            "Yaripon"
+        } else {
+            "Tatepon"
+        };
+        (i, from, to.to_owned())
+    };
+    assert_ne!(from, to, "the test changes the class");
+
+    // An unknown class is rejected.
+    {
+        let mut slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        assert!(
+            slot.set_unit_class(target, "Wizard").is_err(),
+            "unknown class rejected"
+        );
+    }
+
+    // Reclass, save, reopen — the functional class id changed and persisted.
+    let mut slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+    let gid = u32::from_le_bytes(
+        slot.data()[ROSTER_BASE + target * STRIDE + GID..][..4]
+            .try_into()
+            .unwrap(),
+    );
+    slot.set_unit_class(target, &to).unwrap();
+    slot.save().unwrap();
+
+    let slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+    assert_eq!(
+        slot.unit_class(target),
+        Some(to.as_str()),
+        "class changed and persisted"
+    );
+
+    // The id is written in the canonical `unitNNN_01_01` form.
+    let d = slot.data();
+    let base = ROSTER_BASE + target * STRIDE;
+    let idb = &d[base + UNIT_ID..base + UNIT_ID + 13];
+    assert!(
+        idb.starts_with(b"unit") && &idb[7..] == b"_01_01",
+        "canonical class id form"
+    );
+
+    // The deployed-formation copy (if this unit is deployed) mirrors the class.
+    if let Some(fbase) = layout::formation_base(slot.region()) {
+        for j in 0..layout::ROSTER_CAPACITY {
+            let rec = fbase + j * STRIDE;
+            if rec + STRIDE > d.len() {
+                break;
+            }
+            let rec_gid = u32::from_le_bytes(d[rec + GID..][..4].try_into().unwrap());
+            if &d[rec + UNIT_ID..][..4] == b"unit" && rec_gid == gid {
+                assert_eq!(
+                    &d[rec + UNIT_ID..][..13],
+                    &d[base + UNIT_ID..][..13],
+                    "formation copy mirrors the class"
+                );
+            }
+        }
+    }
+
+    fs::remove_dir_all(&root).ok();
+    eprintln!("set_unit_class reclassed {from} -> {to}: +0x50 id + formation mirror");
+}
+
+#[test]
 fn set_unit_weapon_family_equips_a_foreign_weapon() {
     use ptpnhex_core::save::layout;
 

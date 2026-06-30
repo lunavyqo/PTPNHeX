@@ -653,6 +653,69 @@ impl SaveSlot {
         self.data[base + RECORD_HEAD_ECHO] = rarepon.head_echo().expect("non-basic");
     }
 
+    /// Changes unit `index`'s **functional class** — the `unitNNN_01_01` id at
+    /// [`RECORD_UNIT_ID`](crate::save::layout::RECORD_UNIT_ID) (`+0x50`) — and
+    /// mirrors it into the unit's deployed-formation copy.
+    ///
+    /// Only the class *designation* changes. The unit keeps its existing weapon,
+    /// rarepon body, headpiece and gear — all of which are class-flavoured — so a
+    /// reclassed unit is a deliberate hybrid (e.g. a "Tatepon" still holding a
+    /// bow), and the separate *displayed*-class nibble (high nibble of `+0x4E`)
+    /// is left untouched (its mapping is only partly understood). **Whether the
+    /// game renders and behaves correctly with such a hybrid is not yet verified
+    /// on hardware**; align the weapon/rarepon/gear separately for a clean
+    /// conversion.
+    ///
+    /// # Errors
+    /// - the roster slot is empty;
+    /// - `class` is not one of the six unit classes (case-insensitive: Yumipon,
+    ///   Tatepon, Yaripon, Kibapon, Dekapon, Megapon).
+    pub fn set_unit_class(&mut self, index: usize, class: &str) -> Result<()> {
+        let num = class_to_unit_num(class).ok_or_else(|| {
+            Error::Unsupported(format!(
+                "unknown class `{class}` \
+                 (choices: Yumipon, Tatepon, Yaripon, Kibapon, Dekapon, Megapon)"
+            ))
+        })?;
+        let base = self
+            .unit_record(index)
+            .ok_or_else(|| Error::Unsupported(format!("no unit at roster index {index}")))?;
+        let gid = u32::from_le_bytes(
+            self.data[base + crate::save::layout::RECORD_GID..][..4]
+                .try_into()
+                .expect("4 bytes"),
+        );
+        self.write_class_id(base, num);
+        if let Some(fbase) = crate::save::layout::formation_base(self.region) {
+            let stride = crate::save::layout::ROSTER_STRIDE;
+            for j in 0..crate::save::layout::ROSTER_CAPACITY {
+                let rec = fbase + j * stride;
+                if rec + stride > self.data.len() {
+                    break;
+                }
+                let is_unit =
+                    &self.data[rec + crate::save::layout::RECORD_UNIT_ID..][..4] == b"unit";
+                let rec_gid = u32::from_le_bytes(
+                    self.data[rec + crate::save::layout::RECORD_GID..][..4]
+                        .try_into()
+                        .expect("4 bytes"),
+                );
+                if is_unit && rec_gid == gid {
+                    self.write_class_id(rec, num);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Writes the `unitNNN_01_01` class id (+ NUL) into the record at `base`.
+    fn write_class_id(&mut self, base: usize, num: u16) {
+        let id = format!("unit{num:03}_01_01");
+        let off = base + crate::save::layout::RECORD_UNIT_ID;
+        self.data[off..off + id.len()].copy_from_slice(id.as_bytes());
+        self.data[off + id.len()] = 0;
+    }
+
     /// The id of unit `index`'s equipped weapon (for example `"wpn004_008_01"`),
     /// or `None` if the slot is empty or holds no weapon.
     pub fn unit_weapon(&self, index: usize) -> Option<&str> {
@@ -1380,6 +1443,20 @@ fn unit_class_name(id: &[u8]) -> &'static str {
         b"unit007" => "Dekapon",
         b"unit008" => "Megapon",
         _ => "Unknown",
+    }
+}
+
+/// Maps a class name (case-insensitive) to its `unitNNN` number — the inverse
+/// of [`unit_class_name`] — or `None` if it is not one of the six classes.
+fn class_to_unit_num(class: &str) -> Option<u16> {
+    match class.to_ascii_lowercase().as_str() {
+        "yumipon" => Some(2),
+        "tatepon" => Some(3),
+        "yaripon" => Some(4),
+        "kibapon" => Some(6),
+        "dekapon" => Some(7),
+        "megapon" => Some(8),
+        _ => None,
     }
 }
 

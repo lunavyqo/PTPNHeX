@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `set-class` command (and `SaveSlot::set_unit_class`): change a unit's **class** by its roster
+  index, writing the functional `unitNNN` class id at `+0x50` and mirroring the deployed-formation
+  copy. Only the class designation changes — the unit keeps its weapon, rarepon and gear (a hybrid),
+  and the displayed-class nibble (`+0x4E`) is left untouched. **Experimental: the in-game result of a
+  hybrid is not yet hardware-verified.**
 - `set-weapon --family <F>`: equip a unit with a **foreign** weapon family (1 bow, 3 sword,
   4 spear, 6 halberd, 7 hammer, 8 horn) instead of its own. The unit keeps its class's attack
   *action* and the weapon supplies the *projectile* (for the ranged classes) and the stats —
