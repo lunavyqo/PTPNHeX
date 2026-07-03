@@ -152,12 +152,22 @@ pub const RECORD_GID: usize = 0x24;
 /// freshly created unit sets this equal to its [`RECORD_GID`]; the game rewrites
 /// it to a squad slot index when the unit is placed into a battle formation.
 pub const RECORD_GROUP_INDEX: usize = 0x20;
-/// Record-relative offsets a freshly *game-created* unit holds in its "newborn"
-/// state, captured from an in-game unit creation (see `docs/save-format.md`):
-/// two activity counters that start at `0`. Their precise role is undecoded, but
-/// matching them lets [`add_unit`](crate::SaveSlot::add_unit) write a duplicate
-/// that equals a born unit apart from its identity. See [`RECORD_NEWBORN_UNSET`].
-pub const RECORD_NEWBORN_ZERO: [usize; 2] = [0x3C, 0x40];
+/// Record-relative offset of a unit's **reborn count** (`u32` LE): the number of
+/// times the unit has been revived. It is shown on the unit-info screen, which
+/// caps the *display* at 999 though the stored field is a full `u32`; a newborn's
+/// value is `0`. See `docs/save-format.md`.
+pub const RECORD_REBORN_COUNT: usize = 0x3C;
+/// Record-relative offset of a unit's **mission count** (`u32` LE): the number of
+/// missions the unit has taken part in. It is shown on the unit-info screen
+/// (display capped at 999; the stored field is a full `u32`); a newborn's value is
+/// `0`. See `docs/save-format.md`.
+pub const RECORD_MISSION_COUNT: usize = 0x40;
+/// Record-relative offsets a freshly *game-created* unit holds at `0` in its
+/// "newborn" state: the [`RECORD_REBORN_COUNT`] and [`RECORD_MISSION_COUNT`]
+/// activity counters. Matching them lets [`add_unit`](crate::SaveSlot::add_unit)
+/// write a duplicate that equals a born unit apart from its identity. See
+/// [`RECORD_NEWBORN_UNSET`].
+pub const RECORD_NEWBORN_ZERO: [usize; 2] = [RECORD_REBORN_COUNT, RECORD_MISSION_COUNT];
 /// Record-relative offsets that a freshly created unit leaves unset
 /// (`0xFFFFFFFF`): the three per-gear "processed" indices, each 8 bytes past a
 /// gear hash (weapon `+0x94`, head `+0xC4`, third slot `+0xF4`). The game fills

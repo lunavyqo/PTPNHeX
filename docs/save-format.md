@@ -82,8 +82,20 @@ carries:
 The equipped-gear ids reuse the **same family/index taxonomy as the inventory
 armory** — `wpn004_008` is the spear family, item 8 (the eighth spear catalogued
 under *Items*) — so units and the armory share one item-id space. Between the
-identifiers each record also holds numeric per-unit fields (stats), not yet
-individually decoded.
+identifiers each record also holds numeric per-unit fields; two are decoded:
+
+| offset | type | field |
+| --- | --- | --- |
+| `+0x3C` | u32 LE | **reborn count** — times the unit has been revived |
+| `+0x40` | u32 LE | **mission count** — missions the unit has taken part in |
+
+Both are per-unit counters shown on the unit-info screen, and both are mirrored
+into the deployed-formation copy by GID like the ids above. They were pinned by
+reading the pair off the game screen for a nine-unit sample and finding the single
+offset pair whose values matched every unit; across the corpus neither exceeds ~210,
+so only the low byte is exercised, but the fields are word-aligned `u32`s. Whether
+editing them affects anything in game (versus being display-only) is untested. The
+remaining numeric fields are not yet individually decoded.
 
 #### Weapons and gear
 

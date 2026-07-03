@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `set-reborn` and `set-missions` commands (and `SaveSlot::set_unit_reborn` / `set_unit_missions`,
+  plus `unit_reborn` / `unit_missions` readers): edit a unit's per-unit **reborn count** (`+0x3C`)
+  and **mission count** (`+0x40`) — the two `u32` activity counters shown on the unit-info screen —
+  by roster index, mirroring the deployed-formation copy. The stored fields are full `u32`s but the
+  in-game display caps at 999. (These are the two "newborn-zero" counters `add-unit` already zeroed,
+  now decoded.)
 - `set-class` command (and `SaveSlot::set_unit_class`): change a unit's **class** by its roster
   index, writing the functional `unitNNN` class id at `+0x50` and mirroring the deployed-formation
   copy. Only the class designation changes — the unit keeps its weapon, rarepon and gear (a hybrid),
