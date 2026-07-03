@@ -716,6 +716,83 @@ impl SaveSlot {
         self.data[off + id.len()] = 0;
     }
 
+    /// Unit `index`'s **reborn count** (the number of times it has been revived),
+    /// or `None` if the roster slot is empty. The unit-info screen caps the
+    /// *display* at 999; the stored field is a full `u32`.
+    pub fn unit_reborn(&self, index: usize) -> Option<u32> {
+        self.unit_record_u32(index, crate::save::layout::RECORD_REBORN_COUNT)
+    }
+
+    /// Unit `index`'s **mission count** (the number of missions it has taken part
+    /// in), or `None` if the roster slot is empty. The unit-info screen caps the
+    /// *display* at 999; the stored field is a full `u32`.
+    pub fn unit_missions(&self, index: usize) -> Option<u32> {
+        self.unit_record_u32(index, crate::save::layout::RECORD_MISSION_COUNT)
+    }
+
+    /// Reads the `u32` LE at record-relative `offset` in unit `index`'s roster
+    /// record, or `None` if the slot is empty.
+    fn unit_record_u32(&self, index: usize, offset: usize) -> Option<u32> {
+        let base = self.unit_record(index)?;
+        Some(u32::from_le_bytes(
+            self.data[base + offset..][..4].try_into().expect("4 bytes"),
+        ))
+    }
+
+    /// Sets unit `index`'s **reborn count**, mirroring the deployed-formation copy.
+    ///
+    /// The value is a full `u32`, but the unit-info screen displays at most 999.
+    ///
+    /// # Errors
+    /// - the roster slot is empty.
+    pub fn set_unit_reborn(&mut self, index: usize, value: u32) -> Result<()> {
+        self.set_unit_record_u32(index, crate::save::layout::RECORD_REBORN_COUNT, value)
+    }
+
+    /// Sets unit `index`'s **mission count**, mirroring the deployed-formation copy.
+    ///
+    /// The value is a full `u32`, but the unit-info screen displays at most 999.
+    ///
+    /// # Errors
+    /// - the roster slot is empty.
+    pub fn set_unit_missions(&mut self, index: usize, value: u32) -> Result<()> {
+        self.set_unit_record_u32(index, crate::save::layout::RECORD_MISSION_COUNT, value)
+    }
+
+    /// Writes `value` (`u32` LE) at record-relative `offset` in unit `index`'s
+    /// roster record and mirrors it into the deployed-formation copy paired by GID.
+    fn set_unit_record_u32(&mut self, index: usize, offset: usize, value: u32) -> Result<()> {
+        let base = self
+            .unit_record(index)
+            .ok_or_else(|| Error::Unsupported(format!("no unit at roster index {index}")))?;
+        let gid = u32::from_le_bytes(
+            self.data[base + crate::save::layout::RECORD_GID..][..4]
+                .try_into()
+                .expect("4 bytes"),
+        );
+        self.data[base + offset..][..4].copy_from_slice(&value.to_le_bytes());
+        if let Some(fbase) = crate::save::layout::formation_base(self.region) {
+            let stride = crate::save::layout::ROSTER_STRIDE;
+            for j in 0..crate::save::layout::ROSTER_CAPACITY {
+                let rec = fbase + j * stride;
+                if rec + stride > self.data.len() {
+                    break;
+                }
+                let is_unit =
+                    &self.data[rec + crate::save::layout::RECORD_UNIT_ID..][..4] == b"unit";
+                let rec_gid = u32::from_le_bytes(
+                    self.data[rec + crate::save::layout::RECORD_GID..][..4]
+                        .try_into()
+                        .expect("4 bytes"),
+                );
+                if is_unit && rec_gid == gid {
+                    self.data[rec + offset..][..4].copy_from_slice(&value.to_le_bytes());
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// The id of unit `index`'s equipped weapon (for example `"wpn004_008_01"`),
     /// or `None` if the slot is empty or holds no weapon.
     pub fn unit_weapon(&self, index: usize) -> Option<&str> {

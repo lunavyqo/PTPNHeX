@@ -1010,6 +1010,103 @@ fn set_unit_class_reclasses_and_mirrors() {
 }
 
 #[test]
+fn set_unit_reborn_missions_writes_and_mirrors() {
+    use ptpnhex_core::save::layout;
+
+    const ROSTER_BASE: usize = 0x20;
+    const STRIDE: usize = 0x104;
+    const UNIT_ID: usize = 0x50;
+    const GID: usize = 0x24;
+    const REBORN: usize = 0x3C;
+    const MISSIONS: usize = 0x40;
+
+    let Some(dir) = saves_dir() else {
+        eprintln!("skipped: set PTPNHEX_SAVES_DIR");
+        return;
+    };
+    let root = temp_root("counters");
+    let work = working_copy(&dir.join("UCES00995_DATA46"), &root);
+
+    // A filled unit.
+    let target = {
+        let slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        (0..slot.army_size())
+            .find(|&i| slot.unit_class(i).is_some())
+            .expect("a filled unit")
+    };
+
+    // An empty roster slot is rejected.
+    {
+        let mut slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        let empty = slot.army_size();
+        assert!(
+            slot.set_unit_reborn(empty, 1).is_err(),
+            "empty slot rejected"
+        );
+    }
+
+    // Set both counters, save, reopen — the values changed and persisted.
+    let gid = {
+        let mut slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        let gid = u32::from_le_bytes(
+            slot.data()[ROSTER_BASE + target * STRIDE + GID..][..4]
+                .try_into()
+                .unwrap(),
+        );
+        slot.set_unit_reborn(target, 4242).unwrap();
+        slot.set_unit_missions(target, 999_999).unwrap();
+        slot.save().unwrap();
+        gid
+    };
+
+    let slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+    assert_eq!(slot.unit_reborn(target), Some(4242), "reborn persisted");
+    assert_eq!(
+        slot.unit_missions(target),
+        Some(999_999),
+        "missions persisted"
+    );
+
+    // Raw roster bytes are the little-endian u32s.
+    let d = slot.data();
+    let base = ROSTER_BASE + target * STRIDE;
+    assert_eq!(
+        u32::from_le_bytes(d[base + REBORN..][..4].try_into().unwrap()),
+        4242
+    );
+    assert_eq!(
+        u32::from_le_bytes(d[base + MISSIONS..][..4].try_into().unwrap()),
+        999_999
+    );
+
+    // The deployed-formation copy (if this unit is deployed) mirrors both.
+    if let Some(fbase) = layout::formation_base(slot.region()) {
+        for j in 0..layout::ROSTER_CAPACITY {
+            let rec = fbase + j * STRIDE;
+            if rec + STRIDE > d.len() {
+                break;
+            }
+            let rec_gid = u32::from_le_bytes(d[rec + GID..][..4].try_into().unwrap());
+            if &d[rec + UNIT_ID..][..4] == b"unit" && rec_gid == gid {
+                assert_eq!(
+                    u32::from_le_bytes(d[rec + REBORN..][..4].try_into().unwrap()),
+                    4242,
+                    "formation copy mirrors reborn"
+                );
+                assert_eq!(
+                    u32::from_le_bytes(d[rec + MISSIONS..][..4].try_into().unwrap()),
+                    999_999,
+                    "formation copy mirrors missions"
+                );
+            }
+        }
+    }
+
+    fs::remove_dir_all(&root).ok();
+    eprintln!("set_unit_reborn/missions wrote +0x3C/+0x40 + formation mirror");
+}
+
+#[test]
 fn set_unit_weapon_family_equips_a_foreign_weapon() {
     use ptpnhex_core::save::layout;
 

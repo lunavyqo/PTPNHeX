@@ -124,6 +124,35 @@ enum Command {
         #[arg(long, value_name = "DIR")]
         backup_dir: Option<PathBuf>,
     },
+    /// Set a unit's reborn count (times revived) by its roster index (see
+    /// `units`). The unit-info screen shows at most 999, but the stored field is a
+    /// full 32-bit value.
+    SetReborn {
+        /// Path to the save directory.
+        dir: PathBuf,
+        /// Roster index of the unit (from `units`).
+        index: usize,
+        /// New reborn count.
+        value: u32,
+        /// Copy the original files into this directory before saving.
+        /// Must be outside the save directory.
+        #[arg(long, value_name = "DIR")]
+        backup_dir: Option<PathBuf>,
+    },
+    /// Set a unit's mission count by its roster index (see `units`). The unit-info
+    /// screen shows at most 999, but the stored field is a full 32-bit value.
+    SetMissions {
+        /// Path to the save directory.
+        dir: PathBuf,
+        /// Roster index of the unit (from `units`).
+        index: usize,
+        /// New mission count.
+        value: u32,
+        /// Copy the original files into this directory before saving.
+        /// Must be outside the save directory.
+        #[arg(long, value_name = "DIR")]
+        backup_dir: Option<PathBuf>,
+    },
     /// Set a unit's weapon tier by its roster index (see `units`). Grants the
     /// weapon in inventory so it stays equipped.
     SetWeapon {
@@ -377,6 +406,18 @@ fn main() -> Result<()> {
             class,
             backup_dir,
         } => set_class(&dir, index, &class, backup_dir.as_deref()),
+        Command::SetReborn {
+            dir,
+            index,
+            value,
+            backup_dir,
+        } => set_reborn(&dir, index, value, backup_dir.as_deref()),
+        Command::SetMissions {
+            dir,
+            index,
+            value,
+            backup_dir,
+        } => set_missions(&dir, index, value, backup_dir.as_deref()),
         Command::SetWeapon {
             dir,
             index,
@@ -754,6 +795,34 @@ fn set_class(dir: &Path, index: usize, class: &str, backup_dir: Option<&Path>) -
     let to = slot.unit_class(index).unwrap_or("?");
     back_up_and_save(&slot, backup_dir)?;
     println!("Unit {index}: class {from} -> {to} (weapon/rarepon/gear unchanged — a hybrid)");
+    Ok(())
+}
+
+fn set_reborn(dir: &Path, index: usize, value: u32, backup_dir: Option<&Path>) -> Result<()> {
+    let mut slot = open(dir)?;
+    let from = slot.unit_reborn(index).with_context(|| {
+        format!(
+            "no unit at roster index {index} (army has {} units; see `units`)",
+            slot.army_size()
+        )
+    })?;
+    slot.set_unit_reborn(index, value)?;
+    back_up_and_save(&slot, backup_dir)?;
+    println!("Unit {index}: reborn {from} -> {value} (in-game display caps at 999)");
+    Ok(())
+}
+
+fn set_missions(dir: &Path, index: usize, value: u32, backup_dir: Option<&Path>) -> Result<()> {
+    let mut slot = open(dir)?;
+    let from = slot.unit_missions(index).with_context(|| {
+        format!(
+            "no unit at roster index {index} (army has {} units; see `units`)",
+            slot.army_size()
+        )
+    })?;
+    slot.set_unit_missions(index, value)?;
+    back_up_and_save(&slot, backup_dir)?;
+    println!("Unit {index}: missions {from} -> {value} (in-game display caps at 999)");
     Ok(())
 }
 
