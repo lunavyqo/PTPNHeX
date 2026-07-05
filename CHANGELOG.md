@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `move-unit` command (and `SaveSlot::swap_units`): swap two units' **squad positions** by their roster
+  indices. A unit's place in its squad is its roster-slot order (confirmed by diffing an in-game reorder —
+  the game rewrites the roster, not the derived formation array), so this exchanges the two units' data
+  between slots while each slot keeps its GID, and mirrors the deployed-formation copy. Reorders units
+  within a squad; swapping two different classes moves each into the other's squad. **Experimental: the
+  reorder mechanism is confirmed, but the save-edit result is not yet hardware-verified.**
 - `set-reborn` and `set-missions` commands (and `SaveSlot::set_unit_reborn` / `set_unit_missions`,
   plus `unit_reborn` / `unit_missions` readers): edit a unit's per-unit **reborn count** (`+0x3C`)
   and **mission count** (`+0x40`) — the two `u32` activity counters shown on the unit-info screen —

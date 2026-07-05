@@ -1107,6 +1107,121 @@ fn set_unit_reborn_missions_writes_and_mirrors() {
 }
 
 #[test]
+fn swap_units_exchanges_data_keeps_gid_and_mirrors() {
+    use ptpnhex_core::save::layout;
+
+    const ROSTER_BASE: usize = 0x20;
+    const STRIDE: usize = 0x104;
+    const UNIT_ID: usize = 0x50;
+    const GID: usize = 0x24;
+    const WEAPON: usize = 0x74;
+
+    let Some(dir) = saves_dir() else {
+        eprintln!("skipped: set PTPNHEX_SAVES_DIR");
+        return;
+    };
+    let root = temp_root("swap");
+    let work = working_copy(&dir.join("UCES00995_DATA46"), &root);
+
+    // Two distinct filled units.
+    let (a, b) = {
+        let slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        let filled: Vec<usize> = (0..slot.army_size())
+            .filter(|&i| slot.unit_class(i).is_some())
+            .collect();
+        assert!(filled.len() >= 2, "need two units");
+        (filled[0], filled[1])
+    };
+
+    // An empty slot is rejected.
+    {
+        let mut slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        let empty = slot.army_size();
+        assert!(slot.swap_units(a, empty).is_err(), "empty slot rejected");
+    }
+
+    // Capture the two records and their GIDs before.
+    let (rec_a, rec_b, gid_a, gid_b) = {
+        let slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        let d = slot.data();
+        let ba = ROSTER_BASE + a * STRIDE;
+        let bb = ROSTER_BASE + b * STRIDE;
+        (
+            d[ba..ba + STRIDE].to_vec(),
+            d[bb..bb + STRIDE].to_vec(),
+            d[ba + GID..ba + GID + 4].to_vec(),
+            d[bb + GID..bb + GID + 4].to_vec(),
+        )
+    };
+
+    // Swap, save, reopen.
+    {
+        let mut slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        slot.swap_units(a, b).unwrap();
+        slot.save().unwrap();
+    }
+    let slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+    let d = slot.data();
+    let ba = ROSTER_BASE + a * STRIDE;
+    let bb = ROSTER_BASE + b * STRIDE;
+
+    // Each slot kept its own GID; everything else swapped.
+    let mut expect_a = rec_b.clone();
+    expect_a[GID..GID + 4].copy_from_slice(&gid_a);
+    let mut expect_b = rec_a.clone();
+    expect_b[GID..GID + 4].copy_from_slice(&gid_b);
+    assert_eq!(
+        &d[ba + GID..ba + GID + 4],
+        gid_a.as_slice(),
+        "slot a keeps GID"
+    );
+    assert_eq!(
+        &d[bb + GID..bb + GID + 4],
+        gid_b.as_slice(),
+        "slot b keeps GID"
+    );
+    assert_eq!(
+        &d[ba..ba + STRIDE],
+        expect_a.as_slice(),
+        "slot a took unit b"
+    );
+    assert_eq!(
+        &d[bb..bb + STRIDE],
+        expect_b.as_slice(),
+        "slot b took unit a"
+    );
+
+    // Deployed-formation copies (if any) mirror each unit's new data by GID.
+    if let Some(fbase) = layout::formation_base(slot.region()) {
+        for (gid, expect) in [(&gid_a, &expect_a), (&gid_b, &expect_b)] {
+            for j in 0..layout::ROSTER_CAPACITY {
+                let rec = fbase + j * STRIDE;
+                if rec + STRIDE > d.len() {
+                    break;
+                }
+                if &d[rec + UNIT_ID..][..4] == b"unit"
+                    && &d[rec + GID..rec + GID + 4] == gid.as_slice()
+                {
+                    assert_eq!(
+                        &d[rec + UNIT_ID..rec + UNIT_ID + 13],
+                        &expect[UNIT_ID..UNIT_ID + 13],
+                        "formation class mirrored"
+                    );
+                    assert_eq!(
+                        &d[rec + WEAPON..rec + WEAPON + 13],
+                        &expect[WEAPON..WEAPON + 13],
+                        "formation weapon mirrored"
+                    );
+                }
+            }
+        }
+    }
+
+    fs::remove_dir_all(&root).ok();
+    eprintln!("swap_units exchanged {a}<->{b}, kept GIDs, mirrored formation");
+}
+
+#[test]
 fn set_unit_weapon_family_equips_a_foreign_weapon() {
     use ptpnhex_core::save::layout;
 

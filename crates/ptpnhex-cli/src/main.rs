@@ -153,6 +153,24 @@ enum Command {
         #[arg(long, value_name = "DIR")]
         backup_dir: Option<PathBuf>,
     },
+    /// Swap two units' squad positions by their roster indices (see `units`). A
+    /// unit's place in its squad is its roster-slot order; this exchanges the two
+    /// units between slots (each keeps its GID) and updates the deployed-formation
+    /// copy. Reorders units within a squad; swapping two different classes moves
+    /// each into the other's squad. Experimental: the reorder mechanism is
+    /// confirmed, but the save-edit result is not yet hardware-verified.
+    MoveUnit {
+        /// Path to the save directory.
+        dir: PathBuf,
+        /// First unit's roster index (from `units`).
+        a: usize,
+        /// Second unit's roster index (from `units`).
+        b: usize,
+        /// Copy the original files into this directory before saving.
+        /// Must be outside the save directory.
+        #[arg(long, value_name = "DIR")]
+        backup_dir: Option<PathBuf>,
+    },
     /// Set a unit's weapon tier by its roster index (see `units`). Grants the
     /// weapon in inventory so it stays equipped.
     SetWeapon {
@@ -418,6 +436,12 @@ fn main() -> Result<()> {
             value,
             backup_dir,
         } => set_missions(&dir, index, value, backup_dir.as_deref()),
+        Command::MoveUnit {
+            dir,
+            a,
+            b,
+            backup_dir,
+        } => move_unit(&dir, a, b, backup_dir.as_deref()),
         Command::SetWeapon {
             dir,
             index,
@@ -823,6 +847,22 @@ fn set_missions(dir: &Path, index: usize, value: u32, backup_dir: Option<&Path>)
     slot.set_unit_missions(index, value)?;
     back_up_and_save(&slot, backup_dir)?;
     println!("Unit {index}: missions {from} -> {value} (in-game display caps at 999)");
+    Ok(())
+}
+
+fn move_unit(dir: &Path, a: usize, b: usize, backup_dir: Option<&Path>) -> Result<()> {
+    let mut slot = open(dir)?;
+    let n = slot.army_size();
+    let ca = slot.unit_class(a).map(|s| s.to_string());
+    let cb = slot.unit_class(b).map(|s| s.to_string());
+    slot.swap_units(a, b)
+        .with_context(|| format!("swap failed (army has {n} units; see `units`)"))?;
+    back_up_and_save(&slot, backup_dir)?;
+    println!(
+        "Swapped roster {a} <-> {b} ({} <-> {})",
+        ca.as_deref().unwrap_or("?"),
+        cb.as_deref().unwrap_or("?")
+    );
     Ok(())
 }
 
