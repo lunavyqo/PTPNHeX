@@ -793,6 +793,76 @@ impl SaveSlot {
         Ok(())
     }
 
+    /// Swaps the units at roster indices `a` and `b`, exchanging their squad
+    /// positions.
+    ///
+    /// A unit's place in its squad is its **roster-slot order** (confirmed by
+    /// diffing an in-game reorder: the game rewrites the roster, not the derived
+    /// formation array). This swaps the two units' data between the slots while
+    /// **each slot keeps its own GID** — the game re-stamps GIDs to slot order on
+    /// save, so identity stays with the slot. Everything else (class, weapon,
+    /// gear, rarepon, the reborn/mission counters, the group index) moves. The
+    /// deployed-formation copy is updated to match by GID.
+    ///
+    /// Reorders units within a squad; swapping two *different* classes moves each
+    /// into the other's squad (the deploy screen regroups by class on entry).
+    /// **Experimental: the in-game result of the save-edit path is not yet
+    /// hardware-verified** (the reorder *mechanism* is, from the live diff).
+    ///
+    /// # Errors
+    /// - either roster slot is empty.
+    pub fn swap_units(&mut self, a: usize, b: usize) -> Result<()> {
+        if a == b {
+            return Ok(());
+        }
+        let ra = self
+            .unit_record(a)
+            .ok_or_else(|| Error::Unsupported(format!("no unit at roster index {a}")))?;
+        let rb = self
+            .unit_record(b)
+            .ok_or_else(|| Error::Unsupported(format!("no unit at roster index {b}")))?;
+        let stride = crate::save::layout::ROSTER_STRIDE;
+        let gid = crate::save::layout::RECORD_GID;
+        let rec_a = self.data[ra..ra + stride].to_vec();
+        let rec_b = self.data[rb..rb + stride].to_vec();
+        // Each slot receives the other unit's record but keeps its own GID.
+        let mut to_a = rec_b.clone();
+        to_a[gid..gid + 4].copy_from_slice(&rec_a[gid..gid + 4]);
+        let mut to_b = rec_a.clone();
+        to_b[gid..gid + 4].copy_from_slice(&rec_b[gid..gid + 4]);
+        self.data[ra..ra + stride].copy_from_slice(&to_a);
+        self.data[rb..rb + stride].copy_from_slice(&to_b);
+        self.mirror_slot_to_formation(ra);
+        self.mirror_slot_to_formation(rb);
+        Ok(())
+    }
+
+    /// Copies a roster record's unit data into its GID-matched deployed-formation
+    /// copy (preserving the formation record's own group index), keeping the two
+    /// in sync after unit data is moved between slots.
+    fn mirror_slot_to_formation(&mut self, roster_rec: usize) {
+        let Some(fbase) = crate::save::layout::formation_base(self.region) else {
+            return;
+        };
+        let stride = crate::save::layout::ROSTER_STRIDE;
+        let gid_off = crate::save::layout::RECORD_GID;
+        let grp_off = crate::save::layout::RECORD_GROUP_INDEX;
+        let src = self.data[roster_rec..roster_rec + stride].to_vec();
+        let gid = &src[gid_off..gid_off + 4];
+        for j in 0..crate::save::layout::ROSTER_CAPACITY {
+            let rec = fbase + j * stride;
+            if rec + stride > self.data.len() {
+                break;
+            }
+            let is_unit = &self.data[rec + crate::save::layout::RECORD_UNIT_ID..][..4] == b"unit";
+            if is_unit && &self.data[rec + gid_off..rec + gid_off + 4] == gid {
+                let grp = self.data[rec + grp_off..rec + grp_off + 4].to_vec();
+                self.data[rec..rec + stride].copy_from_slice(&src);
+                self.data[rec + grp_off..rec + grp_off + 4].copy_from_slice(&grp);
+            }
+        }
+    }
+
     /// The id of unit `index`'s equipped weapon (for example `"wpn004_008_01"`),
     /// or `None` if the slot is empty or holds no weapon.
     pub fn unit_weapon(&self, index: usize) -> Option<&str> {
