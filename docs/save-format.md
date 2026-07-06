@@ -235,6 +235,42 @@ every unit's `+0x24` to `0..N` whenever it saves**. So a unit's id changes when 
 re-writes the file — compare army state by **content / class**, never by record index across
 a game re-save.
 
+#### Which squads are deployed
+
+The **deployed-formation array is the record of which squads are placed** for battle: a
+deployed unit is present in it, a **benched** unit is simply absent. It holds up to **three
+squads** of up to six units — the deploy screen fields at most three class-blocks (confirmed
+across the whole save corpus and on hardware) — regrouped into contiguous per-class blocks,
+each record carrying a **parade index** at `+0x20` (`0,1,2,…`, the block order being the
+deploy-screen front→back order). The array's live run ends at the first record whose parade
+index breaks the sequence or whose id is `0xFFFFFFFF`.
+
+The roster record's `+0x20` mirrors a *deployed* unit's parade index, but it is **not** a
+reliable deploy flag on its own: the game leaves a **benched** unit's `+0x20` at a stale
+leftover value (it may even collide with the deployed range). The formation array is the
+ground truth.
+
+A second structure sizes the squads for the deploy screen: the **squad-descriptor table** at
+`0x30300` (EU), **three slots `0x188` apart**, ending exactly where the formation array begins.
+Each slot describes one deployed squad; unused slots are zeroed:
+
+| descriptor offset | field |
+| --- | --- |
+| `+0x00` (`u16`, repeated at `+0x02`) | squad unit **count** |
+| `+0x3C` (13 bytes + NUL) | class-id string `unitNNN_01_01` (same text as a record's `+0x50`) |
+| `+0x5C` (`u32`) | class **hash** (equals every member's `+0x70`) |
+
+The game reads these per-squad counts to slice the parade into squads, so **changing a
+deployment must rewrite both** the formation array *and* this table — a stale descriptor makes
+the game group the new units with the *previous* deployment's squad sizes (seen on hardware as
+one six-unit squad shown as two). Rebuilt this way, the output is byte-identical to a save the
+game writes for the same selection.
+
+Two behaviours are **display/role only**, confirmed on hardware: the block order sets the
+*deploy-screen* order (the game's UI can't reorder squads) but the **in-mission** formation is
+still laid out by fixed class roles; and a deployed squad whose gear is not owned in enough
+quantity is reverted to the basic item on load (the same ownership gate as any gear).
+
 #### Adding units past the creation cap
 
 The save stores **no per-class unit cap**. The game's creation menu enforces the
