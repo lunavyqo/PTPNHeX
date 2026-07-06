@@ -871,7 +871,29 @@ fn set_class(dir: &Path, index: usize, class: &str, backup_dir: Option<&Path>) -
     let to = slot.unit_class(index).unwrap_or("?");
     back_up_and_save(&slot, backup_dir)?;
     println!("Unit {index}: class {from} -> {to} (weapon/rarepon/gear unchanged — a hybrid)");
+    warn_deploy_sprite_conflicts(&slot);
     Ok(())
+}
+
+/// Prints a warning if any deployed unit now has a sprite class with no matching
+/// deployed squad — a save the game crashes on when a mission loads. See
+/// `SaveSlot::deploy_sprite_conflicts`.
+fn warn_deploy_sprite_conflicts(slot: &SaveSlot) {
+    let conflicts = slot.deploy_sprite_conflicts();
+    if conflicts.is_empty() {
+        return;
+    }
+    let squads = slot.deployed_squad_classes().join(", ");
+    eprintln!(
+        "warning: a mission will CRASH — a deployed unit's sprite has no squad on the field \
+         (deployed squads: {squads}):"
+    );
+    for (i, sprite) in &conflicts {
+        eprintln!("  unit {i}: {sprite} sprite, but no {sprite} squad is deployed");
+    }
+    eprintln!(
+        "  fix: deploy that class's squad (`set-deploy`), or move the unit out of the deployment."
+    );
 }
 
 fn set_reborn(dir: &Path, index: usize, value: u32, backup_dir: Option<&Path>) -> Result<()> {

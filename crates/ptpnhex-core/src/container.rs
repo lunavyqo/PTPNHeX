@@ -910,6 +910,99 @@ impl SaveSlot {
         out
     }
 
+    /// The classes of the currently deployed squads, front to back.
+    ///
+    /// Read as each squad block's **front unit** class, the blocks sized by the
+    /// deploy-screen squad-descriptor table
+    /// ([`squad_descriptor_base`](crate::save::layout::squad_descriptor_base)). This
+    /// is the set of classes whose battle assets the game loads; a deployed unit
+    /// whose own sprite class is not among them crashes the mission (see
+    /// [`deploy_sprite_conflicts`](Self::deploy_sprite_conflicts)). Empty if the
+    /// region's tables are unmapped.
+    pub fn deployed_squad_classes(&self) -> Vec<&'static str> {
+        use crate::save::layout;
+        let (Some(dbase), Some(fbase)) = (
+            layout::squad_descriptor_base(self.region),
+            layout::formation_base(self.region),
+        ) else {
+            return Vec::new();
+        };
+        let stride = layout::ROSTER_STRIDE;
+        let mut out: Vec<&'static str> = Vec::new();
+        let mut start = 0usize; // a block's front, as an index into the deployed run
+        for k in 0..layout::MAX_DEPLOY_SQUADS {
+            let dslot = dbase + k * layout::SQUAD_DESC_STRIDE;
+            if dslot + 2 > self.data.len() {
+                break;
+            }
+            let size = u16::from_le_bytes(
+                self.data[dslot + layout::SQUAD_DESC_SIZE..][..2]
+                    .try_into()
+                    .expect("2 bytes"),
+            ) as usize;
+            if size == 0 {
+                continue;
+            }
+            let rec = fbase + (start + 1) * stride;
+            if rec + stride <= self.data.len() {
+                let id = &self.data[rec + layout::RECORD_UNIT_ID..][..7];
+                if &id[..4] == b"unit" {
+                    let name = unit_class_name(id);
+                    if !out.contains(&name) {
+                        out.push(name);
+                    }
+                }
+            }
+            start += size;
+        }
+        out
+    }
+
+    /// Deployed units whose sprite class has **no matching deployed squad** — each
+    /// `(roster index, sprite class name)`.
+    ///
+    /// Such a unit crashes a mission on load: the game only loads a class's battle
+    /// assets when that class has a deployed squad, so a "foreign sprite" stranded
+    /// in another squad has nothing to draw (confirmed on hardware for Megapon and
+    /// Kibapon). Empty when the deployment is safe or the region is unmapped.
+    pub fn deploy_sprite_conflicts(&self) -> Vec<(usize, &'static str)> {
+        use crate::save::layout;
+        let squads = self.deployed_squad_classes();
+        let Some(fbase) = layout::formation_base(self.region) else {
+            return Vec::new();
+        };
+        if squads.is_empty() {
+            return Vec::new();
+        }
+        let stride = layout::ROSTER_STRIDE;
+        let mut out: Vec<(usize, &'static str)> = Vec::new();
+        for i in 0..layout::MAX_DEPLOY_SQUADS * layout::SQUAD_MAX {
+            let rec = fbase + (i + 1) * stride;
+            if rec + stride > self.data.len() {
+                break;
+            }
+            let gi = u32::from_le_bytes(
+                self.data[rec + layout::RECORD_GROUP_INDEX..][..4]
+                    .try_into()
+                    .expect("4 bytes"),
+            );
+            let gid = u32::from_le_bytes(
+                self.data[rec + layout::RECORD_GID..][..4]
+                    .try_into()
+                    .expect("4 bytes"),
+            );
+            let id = &self.data[rec + layout::RECORD_UNIT_ID..][..7];
+            if gi as usize != i || gid == u32::MAX || &id[..4] != b"unit" {
+                break;
+            }
+            let sprite = unit_class_name(id);
+            if !squads.contains(&sprite) {
+                out.push((gid as usize, sprite));
+            }
+        }
+        out
+    }
+
     /// Sets which squads are deployed to battle — and their front-to-back parade
     /// order — rebuilding the deployed-formation array from the roster.
     ///

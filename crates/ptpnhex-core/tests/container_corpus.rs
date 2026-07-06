@@ -1698,3 +1698,67 @@ fn set_deploy_byte_exact_and_reselects_on_data46() {
     fs::remove_dir_all(&root).ok();
     eprintln!("set_deploy: byte-exact re-select + reorder + persist on DATA46");
 }
+
+#[test]
+fn deploy_sprite_conflicts_flags_foreign_sprites() {
+    let Some(dir) = saves_dir() else {
+        eprintln!("skipped: set PTPNHEX_SAVES_DIR");
+        return;
+    };
+    let root = temp_root("deploy-conflict");
+    let work = working_copy(&dir.join("UCES00995_DATA46"), &root);
+
+    // A clean Tatepon|Yaripon|Yumipon deployment has no conflicts.
+    let mid_yumi = {
+        let mut slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        slot.set_deploy(&["tate", "yari", "yumi"]).unwrap();
+        assert!(
+            slot.deploy_sprite_conflicts().is_empty(),
+            "clean deploy has no conflicts"
+        );
+        assert_eq!(
+            slot.deployed_squad_classes(),
+            vec!["Tatepon", "Yaripon", "Yumipon"]
+        );
+        // a non-front Yumipon (front is the lowest roster slot of the class)
+        let yumis: Vec<usize> = (0..slot.army_size())
+            .filter(|&i| slot.unit_class(i) == Some("Yumipon"))
+            .collect();
+        yumis[1]
+    };
+
+    // Reclassing a mid Yumipon to Kibapon strands a Kibapon sprite with no Kiba
+    // squad on the field -> flagged as a crash risk.
+    {
+        let mut slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        slot.set_deploy(&["tate", "yari", "yumi"]).unwrap();
+        slot.set_unit_class(mid_yumi, "kibapon").unwrap();
+        let c = slot.deploy_sprite_conflicts();
+        assert_eq!(
+            c,
+            vec![(mid_yumi, "Kibapon")],
+            "the foreign Kiba sprite is flagged"
+        );
+        // the squad classes are unchanged (the block fronts are still Tate/Yari/Yumi)
+        assert_eq!(
+            slot.deployed_squad_classes(),
+            vec!["Tatepon", "Yaripon", "Yumipon"]
+        );
+    }
+
+    // The same foreign Kiba sprite is safe once a Kibapon squad is also deployed.
+    {
+        let mut slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        slot.set_deploy(&["tate", "yumi", "kiba"]).unwrap();
+        slot.set_unit_class(mid_yumi, "kibapon").unwrap();
+        assert!(
+            slot.deploy_sprite_conflicts().is_empty(),
+            "a Kiba sprite is safe when a Kiba squad is deployed"
+        );
+    }
+
+    fs::remove_dir_all(&root).ok();
+    eprintln!(
+        "deploy_sprite_conflicts: flags foreign sprites, clears when the class's squad deploys"
+    );
+}
