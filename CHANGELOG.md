@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Deploy sprite-crash guard: `set-class` now warns when it strands a **deployed** unit whose sprite
+  class has no matching deployed squad — a save the game crashes on when a mission loads its assets
+  (confirmed on hardware for Megapon and Kibapon). New `SaveSlot::deploy_sprite_conflicts` (the offending
+  `(roster index, sprite class)` pairs) and `deployed_squad_classes` (the squad classes whose battle
+  assets load, read from the squad-descriptor front units). The fix is to deploy that class's squad
+  (`set-deploy`) or move the unit out of the deployment.
+
 - `set-deploy` command (and `SaveSlot::set_deploy` / `deployment`): choose **which squads are placed**
   in the battle formation. Names 1–3 classes (short forms `tate`/`yari`/`yumi`/`kiba`/`deka`/`mega`
   accepted), first = front; each named class deploys its whole squad (up to six) and the rest are

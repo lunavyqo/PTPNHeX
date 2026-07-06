@@ -271,6 +271,14 @@ Two behaviours are **display/role only**, confirmed on hardware: the block order
 still laid out by fixed class roles; and a deployed squad whose gear is not owned in enough
 quantity is reverted to the basic item on load (the same ownership gate as any gear).
 
+One combination **crashes**, confirmed on hardware (for Megapon and Kibapon): a deployed unit whose
+own sprite class (`+0x50`) is not one of the deployed squad classes. The game loads a class's battle
+assets only when that class has a deployed squad, so a "foreign sprite" stranded inside another squad
+has nothing to draw and the mission crashes on load — before the sprite is ever shown (the pre-mission
+screen only shows each squad's badge class). Deploying that class's own squad makes the assets present
+and it renders fine. An editor changing a deployed unit's class should guard against leaving such a
+unit.
+
 #### Adding units past the creation cap
 
 The save stores **no per-class unit cap**. The game's creation menu enforces the
