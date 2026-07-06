@@ -1762,3 +1762,44 @@ fn deploy_sprite_conflicts_flags_foreign_sprites() {
         "deploy_sprite_conflicts: flags foreign sprites, clears when the class's squad deploys"
     );
 }
+
+#[test]
+fn picked_stew_and_miracle_round_trip() {
+    use ptpnhex_core::save::layout;
+    let Some(dir) = saves_dir() else {
+        eprintln!("skipped: set PTPNHEX_SAVES_DIR");
+        return;
+    };
+    let root = temp_root("loadout-pick");
+    let work = working_copy(&dir.join("UCES00995_DATA46"), &root);
+
+    let mut slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+    // Set both, read back (King's Stew = 2, Earthquake Miracle = 3).
+    slot.set_picked_stew(Some(2)).unwrap();
+    slot.set_picked_miracle(3).unwrap();
+    assert_eq!(slot.picked_stew(), Some(2));
+    assert_eq!(slot.picked_miracle(), Some(3));
+    // Setting either marks the mission-prep flag.
+    let flag = layout::mission_prep_flag_offset(ptpnhex_core::save::Region::Europe).unwrap();
+    assert_eq!(
+        slot.data()[flag] & layout::MISSION_PREP_SET,
+        layout::MISSION_PREP_SET
+    );
+    // "No stew" round-trips.
+    slot.set_picked_stew(None).unwrap();
+    assert_eq!(slot.picked_stew(), None);
+    // Out-of-range indices are rejected.
+    assert!(slot.set_picked_stew(Some(4)).is_err());
+    assert!(slot.set_picked_miracle(4).is_err());
+
+    // Persists across a save/reload.
+    slot.set_picked_stew(Some(1)).unwrap();
+    slot.set_picked_miracle(0).unwrap();
+    slot.save().unwrap();
+    let re = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+    assert_eq!(re.picked_stew(), Some(1));
+    assert_eq!(re.picked_miracle(), Some(0));
+
+    fs::remove_dir_all(&root).ok();
+    eprintln!("picked_stew/miracle: set, read back, reject out-of-range, persist");
+}
