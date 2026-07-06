@@ -138,6 +138,12 @@ pub const ROSTER_CAPACITY: usize = 123;
 /// [`add_unit`](crate::SaveSlot::add_unit) refuses past this. Confirmed on
 /// hardware: six of every class fields fine; a seventh crashes.
 pub const SQUAD_MAX: usize = 6;
+/// The most squads the battle deploy screen fields at once. The deployed
+/// formation is a leading `none` marker followed by up to this many class
+/// blocks of [`SQUAD_MAX`] units (so `1 + MAX_DEPLOY_SQUADS * SQUAD_MAX` records
+/// wide). Confirmed across the whole save corpus: no save ever deploys more than
+/// three squad-classes, even late-game with all six classes raised.
+pub const MAX_DEPLOY_SQUADS: usize = 3;
 /// Record-relative offset of a unit's class id (`unitNNN_…` ASCII).
 pub const RECORD_UNIT_ID: usize = 0x50;
 /// Record-relative offset of the rarepon body code (`u32` LE — see
@@ -185,6 +191,11 @@ pub const RECORD_HEAD_HASH: usize = 0xC4;
 pub const RECORD_HEAD_FLAG: usize = 0xC8;
 /// Record-relative offset of the headpiece numeric echo (`160 + hlm#`).
 pub const RECORD_HEAD_ECHO: usize = 0xD0;
+/// Record-relative offset of the **squad hash** (`u32` LE): a per-class identifier
+/// shared by every unit of a squad. The deploy screen's squad-descriptor table
+/// ([`squad_descriptor_base`]) stores this same value per deployed squad, so a
+/// squad's descriptor takes it from its front unit's record here.
+pub const RECORD_SQUAD_HASH: usize = 0x70;
 /// Record-relative offset of a unit's equipped weapon id string
 /// (`wpnNNN_TTT_VV`); see [`weapon`](crate::save::weapon).
 pub const RECORD_WEAPON_ID: usize = 0x74;
@@ -228,6 +239,36 @@ pub fn army_count_offset(region: Region) -> Option<usize> {
 pub fn formation_base(region: Region) -> Option<usize> {
     match region {
         Region::Europe => Some(0x30670),
+        Region::NorthAmerica | Region::Japan => None,
+    }
+}
+
+/// Distance between consecutive squad descriptors in the deploy-screen
+/// [squad-descriptor table](squad_descriptor_base).
+pub const SQUAD_DESC_STRIDE: usize = 0x188;
+/// Descriptor-relative offset of a squad's **unit count** (`u16` LE, stored twice
+/// at `+0x0` and `+0x2`).
+pub const SQUAD_DESC_SIZE: usize = 0x0;
+/// Descriptor-relative offset of a squad's **class-id string** (`unitNNN_01_01`,
+/// 13 bytes + NUL) — the same text a unit record holds at [`RECORD_UNIT_ID`].
+pub const SQUAD_DESC_CLASS: usize = 0x3C;
+/// Descriptor-relative offset of a squad's **class-hash** (`u32` LE) — equal to
+/// each member's [`RECORD_SQUAD_HASH`].
+pub const SQUAD_DESC_HASH: usize = 0x5C;
+
+/// Base offset of the deploy-screen **squad-descriptor table**: up to
+/// [`MAX_DEPLOY_SQUADS`] fixed slots, [`SQUAD_DESC_STRIDE`] apart, ending where the
+/// deployed-[`formation_base`] array begins. Each slot describes one deployed squad
+/// — its [size](SQUAD_DESC_SIZE), [class id](SQUAD_DESC_CLASS) and
+/// [hash](SQUAD_DESC_HASH) — and the deploy screen groups the parade by these
+/// per-slot sizes. It is **separate** from the formation array and must be rewritten
+/// alongside it: leaving a stale descriptor makes the game slice the new units with
+/// the previous deployment's squad sizes (confirmed on hardware by diffing a
+/// game-authored re-deploy). Unused slots are zeroed. Confirmed for Europe at
+/// `0x30300`.
+pub fn squad_descriptor_base(region: Region) -> Option<usize> {
+    match region {
+        Region::Europe => Some(0x30300),
         Region::NorthAmerica | Region::Japan => None,
     }
 }

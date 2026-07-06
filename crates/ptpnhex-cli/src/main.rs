@@ -171,6 +171,25 @@ enum Command {
         #[arg(long, value_name = "DIR")]
         backup_dir: Option<PathBuf>,
     },
+    /// Choose which squads deploy to battle. With no class names it just prints
+    /// the current deployment.
+    ///
+    /// Names 1–3 classes, first = front (Yumipon, Tatepon, Yaripon, Kibapon,
+    /// Dekapon, Megapon; short forms yumi/tate/yari/kiba/deka/mega also work).
+    /// Each named class deploys its whole squad (up to six); unnamed classes are
+    /// benched. The order sets the deploy-screen order (which the game's UI can't
+    /// change), but the in-mission formation is still ordered by the game's fixed
+    /// class roles. Hardware-confirmed on the EU release.
+    SetDeploy {
+        /// Path to the save directory.
+        dir: PathBuf,
+        /// Classes to field, front to back. Empty = show the current deployment.
+        classes: Vec<String>,
+        /// Copy the original files into this directory before saving.
+        /// Must be outside the save directory.
+        #[arg(long, value_name = "DIR")]
+        backup_dir: Option<PathBuf>,
+    },
     /// Set a unit's weapon tier by its roster index (see `units`). Grants the
     /// weapon in inventory so it stays equipped.
     SetWeapon {
@@ -436,6 +455,11 @@ fn main() -> Result<()> {
             value,
             backup_dir,
         } => set_missions(&dir, index, value, backup_dir.as_deref()),
+        Command::SetDeploy {
+            dir,
+            classes,
+            backup_dir,
+        } => set_deploy(&dir, &classes, backup_dir.as_deref()),
         Command::MoveUnit {
             dir,
             a,
@@ -758,6 +782,7 @@ fn units(dir: &Path) -> Result<()> {
     let slot = open(dir)?;
     let n = slot.army_size();
     println!("Army: {n} units");
+    println!("Deployed: {}", deployment_line(&slot));
     for i in 0..n {
         let class = slot.unit_class(i).unwrap_or("Unknown");
         let rarepon = slot.unit_rarepon(i).map_or_else(
@@ -770,6 +795,33 @@ fn units(dir: &Path) -> Result<()> {
         let weapon = slot.unit_weapon(i).unwrap_or("-");
         println!("  [{i:>3}] {class:<8} {rarepon:<10} {weapon}");
     }
+    Ok(())
+}
+
+/// The current deployment as a one-line summary, for example
+/// `Tatepon x6 | Yaripon x6 | Yumipon x6`, or `(nothing)` if empty.
+fn deployment_line(slot: &SaveSlot) -> String {
+    let d = slot.deployment();
+    if d.is_empty() {
+        return "(nothing)".to_string();
+    }
+    d.iter()
+        .map(|(class, count)| format!("{class} x{count}"))
+        .collect::<Vec<_>>()
+        .join(" | ")
+}
+
+fn set_deploy(dir: &Path, classes: &[String], backup_dir: Option<&Path>) -> Result<()> {
+    let mut slot = open(dir)?;
+    // No classes named: report the current deployment without touching the save.
+    if classes.is_empty() {
+        println!("Deployed: {}", deployment_line(&slot));
+        return Ok(());
+    }
+    let names: Vec<&str> = classes.iter().map(String::as_str).collect();
+    slot.set_deploy(&names)?;
+    back_up_and_save(&slot, backup_dir)?;
+    println!("Deployed: {}", deployment_line(&slot));
     Ok(())
 }
 

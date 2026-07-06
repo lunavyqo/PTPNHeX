@@ -1524,3 +1524,177 @@ fn add_unit_duplicates_with_gear_and_headpiece_and_caps_at_six() {
         layout::SQUAD_MAX
     );
 }
+
+#[test]
+fn set_deploy_is_deterministic_and_fields_full_squads() {
+    use ptpnhex_core::save::layout;
+    let Some(dir) = saves_dir() else {
+        eprintln!("skipped: set PTPNHEX_SAVES_DIR");
+        return;
+    };
+    let root = temp_root("deploy-corpus");
+    let mut checked = 0usize;
+    for save in patapon_saves(&dir) {
+        let work = working_copy(&save, &root);
+        // The classes currently deployed, in parade order.
+        let classes: Vec<String> = {
+            let slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+            slot.deployment()
+                .iter()
+                .map(|(c, _)| (*c).to_string())
+                .collect()
+        };
+        if classes.is_empty() {
+            continue; // nothing deployed, or an unmapped region
+        }
+        let names: Vec<&str> = classes.iter().map(String::as_str).collect();
+
+        let mut slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        // Re-deploying a class fields its whole squad (roster count, capped).
+        let expect: Vec<(String, usize)> = names
+            .iter()
+            .map(|&c| {
+                let count = (0..slot.army_size())
+                    .filter(|&i| slot.unit_class(i) == Some(c))
+                    .count()
+                    .min(layout::SQUAD_MAX);
+                (c.to_string(), count)
+            })
+            .collect();
+
+        slot.set_deploy(&names).unwrap();
+        let got: Vec<(String, usize)> = slot
+            .deployment()
+            .iter()
+            .map(|(c, n)| ((*c).to_string(), *n))
+            .collect();
+        assert_eq!(
+            got,
+            expect,
+            "{}: deployment lists the full named squads in order",
+            save.display()
+        );
+
+        // Applying the same selection again changes nothing (deterministic).
+        let before = slot.data().to_vec();
+        slot.set_deploy(&names).unwrap();
+        assert_eq!(
+            slot.data(),
+            &before[..],
+            "{}: set_deploy is idempotent",
+            save.display()
+        );
+
+        // The selection survives a save/reload.
+        slot.save().unwrap();
+        let reopened = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        let after: Vec<(String, usize)> = reopened
+            .deployment()
+            .iter()
+            .map(|(c, n)| ((*c).to_string(), *n))
+            .collect();
+        assert_eq!(after, expect, "{}: deployment persists", save.display());
+        checked += 1;
+    }
+    fs::remove_dir_all(&root).ok();
+    assert!(checked > 0, "corpus had at least one deployable save");
+    eprintln!("set_deploy: deterministic + full-squad on {checked} corpus saves");
+}
+
+#[test]
+fn set_deploy_byte_exact_and_reselects_on_data46() {
+    use ptpnhex_core::save::layout;
+    let Some(dir) = saves_dir() else {
+        eprintln!("skipped: set PTPNHEX_SAVES_DIR");
+        return;
+    };
+    let root = temp_root("deploy-46");
+    let work = working_copy(&dir.join("UCES00995_DATA46"), &root);
+    let fbase = layout::formation_base(ptpnhex_core::save::Region::Europe).unwrap();
+    let stride = layout::ROSTER_STRIDE;
+
+    // Pristine DATA46 deploys Megapon | Yaripon | Yumipon (all full); Tate/Kiba/Deka benched.
+    {
+        let slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        assert_eq!(
+            slot.deployment(),
+            vec![("Megapon", 3), ("Yaripon", 6), ("Yumipon", 6)],
+            "pristine DATA46 deployment"
+        );
+    }
+
+    // Re-selecting the current full deployment in the same order is a WHOLE-SAVE
+    // no-op: benched squads are left untouched and every deployed unit already holds
+    // its parade index, so the output is byte-identical to what the game wrote.
+    {
+        let mut slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        let before: Vec<u8> = slot.data().to_vec();
+        slot.set_deploy(&["Megapon", "Yaripon", "Yumipon"]).unwrap();
+        assert_eq!(
+            slot.data(),
+            &before[..],
+            "re-selecting the current deployment changes nothing"
+        );
+    }
+
+    // A real change (short aliases): field only the Tatepons.
+    {
+        let mut slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        slot.set_deploy(&["tate"]).unwrap();
+        assert_eq!(slot.deployment(), vec![("Tatepon", 6)]);
+        // The run terminates right after the block: slot 7 (index 6) is the marker.
+        let term = fbase + 7 * stride + layout::RECORD_GID;
+        assert_eq!(
+            u32::from_le_bytes(slot.data()[term..term + 4].try_into().unwrap()),
+            u32::MAX,
+            "formation run ends after the Tatepon block"
+        );
+        // The squad-descriptor table is rewritten: slot 0 = Tatepon (unit003) size 6,
+        // slots 1 and 2 zeroed. A stale table here is what mis-grouped the units.
+        let dbase = layout::squad_descriptor_base(ptpnhex_core::save::Region::Europe).unwrap();
+        let d = slot.data();
+        assert_eq!(
+            u16::from_le_bytes(d[dbase..dbase + 2].try_into().unwrap()),
+            6,
+            "descriptor slot 0 size"
+        );
+        assert_eq!(
+            &d[dbase + layout::SQUAD_DESC_CLASS..dbase + layout::SQUAD_DESC_CLASS + 13],
+            b"unit003_01_01",
+            "descriptor slot 0 class id"
+        );
+        let slot1 = dbase + layout::SQUAD_DESC_STRIDE;
+        assert_eq!(
+            u16::from_le_bytes(d[slot1..slot1 + 2].try_into().unwrap()),
+            0,
+            "descriptor slot 1 zeroed"
+        );
+        slot.save().unwrap();
+        let re = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        assert_eq!(re.deployment(), vec![("Tatepon", 6)], "change persists");
+    }
+
+    // Reordering (an editor extra the game's UI cannot do): Yumipon front, Tatepon back.
+    {
+        let mut slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        slot.set_deploy(&["yumi", "tate"]).unwrap();
+        assert_eq!(slot.deployment(), vec![("Yumipon", 6), ("Tatepon", 6)]);
+    }
+
+    // Rejections.
+    {
+        let mut slot = SaveSlot::open(&work, &KeyProvider::Embedded).unwrap();
+        assert!(slot.set_deploy(&[]).is_err(), "empty selection");
+        assert!(
+            slot.set_deploy(&["tate", "yari", "yumi", "mega"]).is_err(),
+            "four squads"
+        );
+        assert!(
+            slot.set_deploy(&["tate", "tate"]).is_err(),
+            "duplicate class"
+        );
+        assert!(slot.set_deploy(&["wizardpon"]).is_err(), "unknown class");
+    }
+    fs::remove_dir_all(&root).ok();
+    eprintln!("set_deploy: byte-exact re-select + reorder + persist on DATA46");
+}

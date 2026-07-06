@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `set-deploy` command (and `SaveSlot::set_deploy` / `deployment`): choose **which squads are placed**
+  in the battle formation. Names 1–3 classes (short forms `tate`/`yari`/`yumi`/`kiba`/`deka`/`mega`
+  accepted), first = front; each named class deploys its whole squad (up to six) and the rest are
+  benched. Rebuilding a deployment writes **two** structures: the deployed-formation array at `0x30670`
+  (a leading `none` marker then the units regrouped into contiguous class blocks — each deployed record a
+  byte copy of its roster twin; a benched squad is simply absent) **and** the deploy-screen
+  squad-descriptor table at `0x30300` (per squad: unit count, class id and hash), which the game reads to
+  size the squads — a stale table mis-slices the parade. With no class names, prints the current
+  deployment; `units` now shows it too. `class_to_unit_num` also gained short-form aliases (so
+  `set-class` accepts them). **Hardware-confirmed on the EU release:** the named squads deploy, benched
+  squads stay selectable, and the deploy screen groups them correctly. The named order sets the
+  *deploy-screen* order (which the game's own UI can't change); note the **in-mission** formation is
+  still ordered by the game's fixed class roles, so ordering is a selection-screen nicety, not a battle
+  change. A deployed squad whose gear you don't own enough of is reverted to basic by the game on load
+  (its normal ownership check), unchanged by this command.
 - `move-unit` command (and `SaveSlot::swap_units`): swap two units' **squad positions** by their roster
   indices. A unit's place in its squad is its roster-slot order (confirmed by diffing an in-game reorder —
   the game rewrites the roster, not the derived formation array), so this exchanges the two units' data

@@ -863,6 +863,214 @@ impl SaveSlot {
         }
     }
 
+    /// The squads currently deployed to battle, as `(class name, unit count)` in
+    /// front-to-back parade order.
+    ///
+    /// The deployed-formation array at [`formation_base`](crate::save::layout::formation_base)
+    /// is the ground truth for what is placed: a leading `none` marker, then the
+    /// deployed units regrouped into contiguous class blocks, each carrying a
+    /// parade index `0,1,2,…` at [`RECORD_GROUP_INDEX`](crate::save::layout::RECORD_GROUP_INDEX).
+    /// A benched squad is simply absent. The run ends at the first slot whose
+    /// parade index breaks the sequence or whose GID is unset. (The matching roster
+    /// `+0x20` is only a stale cache — it is *not* read here.)
+    pub fn deployment(&self) -> Vec<(&'static str, usize)> {
+        use crate::save::layout;
+        let Some(fbase) = layout::formation_base(self.region) else {
+            return Vec::new();
+        };
+        let stride = layout::ROSTER_STRIDE;
+        let mut out: Vec<(&'static str, usize)> = Vec::new();
+        for i in 0..layout::MAX_DEPLOY_SQUADS * layout::SQUAD_MAX {
+            let rec = fbase + (i + 1) * stride;
+            if rec + stride > self.data.len() {
+                break;
+            }
+            let gi = u32::from_le_bytes(
+                self.data[rec + layout::RECORD_GROUP_INDEX..][..4]
+                    .try_into()
+                    .expect("4 bytes"),
+            );
+            let gid = u32::from_le_bytes(
+                self.data[rec + layout::RECORD_GID..][..4]
+                    .try_into()
+                    .expect("4 bytes"),
+            );
+            let id = &self.data[rec + layout::RECORD_UNIT_ID..][..7];
+            // The deployed run is exactly the records whose parade index counts up
+            // 0,1,2,…; stop at the first break, unset GID, or non-unit record.
+            if gi as usize != i || gid == u32::MAX || &id[..4] != b"unit" {
+                break;
+            }
+            let class = unit_class_name(id);
+            match out.last_mut() {
+                Some(last) if last.0 == class => last.1 += 1,
+                _ => out.push((class, 1)),
+            }
+        }
+        out
+    }
+
+    /// Sets which squads are deployed to battle — and their front-to-back parade
+    /// order — rebuilding the deployed-formation array from the roster.
+    ///
+    /// `squads` names the classes to field, in order (first named = front). Each
+    /// named class deploys its **whole squad**: every roster unit of that class, in
+    /// roster order, capped at [`SQUAD_MAX`](crate::save::layout::SQUAD_MAX) (a
+    /// seventh would crash the deploy screen). Any class not named is benched.
+    ///
+    /// The game's own deploy screen fields at most
+    /// [`MAX_DEPLOY_SQUADS`](crate::save::layout::MAX_DEPLOY_SQUADS) squads and
+    /// offers no way to reorder them; this reproduces the selection and sets the
+    /// order the UI can't. That order is the *deploy-screen* order only — the
+    /// in-mission formation is still laid out by the game's fixed class roles.
+    ///
+    /// Two structures are rewritten together: the deployed-formation array
+    /// ([`formation_base`](crate::save::layout::formation_base)) and the deploy
+    /// screen's squad-descriptor table
+    /// ([`squad_descriptor_base`](crate::save::layout::squad_descriptor_base)),
+    /// which sizes each squad — a stale descriptor makes the game slice the parade
+    /// with the previous deployment's squad sizes.
+    ///
+    /// A deployed formation record is a byte copy of its roster record (the roster
+    /// record's [`RECORD_GROUP_INDEX`](crate::save::layout::RECORD_GROUP_INDEX) is
+    /// first set to the parade index), so the rebuilt array is byte-identical to
+    /// one the game writes for the same selection.
+    ///
+    /// # Errors
+    /// - `squads` is empty or has more than
+    ///   [`MAX_DEPLOY_SQUADS`](crate::save::layout::MAX_DEPLOY_SQUADS) entries;
+    /// - a class is named more than once;
+    /// - a class name is not one of the six classes;
+    /// - a named class has no unit in the roster;
+    /// - the region's formation layout is unmapped or out of bounds.
+    pub fn set_deploy(&mut self, squads: &[&str]) -> Result<()> {
+        use crate::save::layout;
+        if squads.is_empty() {
+            return Err(Error::Unsupported(
+                "name at least one squad to deploy".into(),
+            ));
+        }
+        if squads.len() > layout::MAX_DEPLOY_SQUADS {
+            return Err(Error::Unsupported(format!(
+                "at most {} squads deploy at once (named {})",
+                layout::MAX_DEPLOY_SQUADS,
+                squads.len()
+            )));
+        }
+        let stride = layout::ROSTER_STRIDE;
+        let slots = 1 + layout::MAX_DEPLOY_SQUADS * layout::SQUAD_MAX;
+        let fbase = layout::formation_base(self.region)
+            .filter(|&b| b + slots * stride <= self.data.len())
+            .ok_or_else(|| {
+                Error::Unsupported("deploy formation layout is unmapped for this region".into())
+            })?;
+
+        // Resolve names to class numbers + ids, rejecting duplicates.
+        let mut nums: Vec<u16> = Vec::with_capacity(squads.len());
+        let mut ids: Vec<[u8; 7]> = Vec::with_capacity(squads.len());
+        for &name in squads {
+            let num = class_to_unit_num(name).ok_or_else(|| {
+                Error::Unsupported(format!(
+                    "unknown class `{name}` \
+                     (choices: Yumipon, Tatepon, Yaripon, Kibapon, Dekapon, Megapon)"
+                ))
+            })?;
+            let mut id = [0u8; 7];
+            id.copy_from_slice(format!("unit{num:03}").as_bytes());
+            if ids.contains(&id) {
+                return Err(Error::Unsupported(format!("class `{name}` named twice")));
+            }
+            nums.push(num);
+            ids.push(id);
+        }
+
+        // Gather the deployed roster indices, squad by squad in the named order,
+        // each squad's units in roster order and capped at SQUAD_MAX.
+        let n = self.army_size();
+        let mut squads: Vec<(u16, Vec<usize>)> = Vec::with_capacity(ids.len());
+        for (&num, id) in nums.iter().zip(&ids) {
+            let members: Vec<usize> = (0..n)
+                .filter(|&i| self.unit_class_id(i).as_ref() == Some(id))
+                .take(layout::SQUAD_MAX)
+                .collect();
+            if members.is_empty() {
+                return Err(Error::Unsupported(format!(
+                    "no {} squad in this army",
+                    unit_class_name(id)
+                )));
+            }
+            squads.push((num, members));
+        }
+        let deployed: Vec<usize> = squads.iter().flat_map(|(_, m)| m.iter().copied()).collect();
+
+        let grp = layout::RECORD_GROUP_INDEX;
+        // Materialize the parade: stamp each deployed unit's roster parade index,
+        // then copy the whole record into formation slot `p + 1` (slot 0 stays the
+        // `none` marker). The copy carries the record's own GID, so it pairs back.
+        //
+        // Benched units are deliberately left untouched. Deployment is decided by
+        // the formation array's membership, not by the roster's `+0x20`: a real save
+        // leaves a benched squad's `+0x20` at stale leftover values (they may even
+        // overlap the deployed range). An earlier version zeroed every benched
+        // unit's `+0x20` to `0xFFFFFFFF`; on hardware that dropped the benched
+        // squads out of the deploy screen entirely and confused the initial
+        // squad-grouping, so it is not done. This leaves the output shape-identical
+        // to a save the game itself would write for the same selection.
+        for (p, &ri) in deployed.iter().enumerate() {
+            let rb = self.unit_record(ri).expect("gathered index is filled");
+            self.data[rb + grp..][..4].copy_from_slice(&(p as u32).to_le_bytes());
+            let src = self.data[rb..rb + stride].to_vec();
+            let frec = fbase + (p + 1) * stride;
+            self.data[frec..frec + stride].copy_from_slice(&src);
+        }
+        // Clear the rest of the formation window to the empty marker so the run
+        // terminates right after the last deployed unit.
+        for p in deployed.len()..layout::MAX_DEPLOY_SQUADS * layout::SQUAD_MAX {
+            let frec = fbase + (p + 1) * stride;
+            self.data[frec + layout::RECORD_GID..][..4].copy_from_slice(&u32::MAX.to_le_bytes());
+            self.data[frec + grp..][..4].copy_from_slice(&u32::MAX.to_le_bytes());
+        }
+
+        // Rewrite the deploy-screen squad-descriptor table: one slot per deployed
+        // squad (its unit count, class id and hash), the rest zeroed. The game reads
+        // these per-squad sizes to split the parade into squads, so a stale table
+        // slices the new units with the previous deployment's boundaries (the "two
+        // Tatepon squads" seen on hardware). Region-gated; skipped if unmapped.
+        if let Some(dbase) = layout::squad_descriptor_base(self.region) {
+            for k in 0..layout::MAX_DEPLOY_SQUADS {
+                let slot = dbase + k * layout::SQUAD_DESC_STRIDE;
+                let size_off = slot + layout::SQUAD_DESC_SIZE;
+                let class_off = slot + layout::SQUAD_DESC_CLASS;
+                let hash_off = slot + layout::SQUAD_DESC_HASH;
+                match squads.get(k) {
+                    Some((num, members)) => {
+                        let count = members.len() as u16;
+                        // The unit count is stored twice (at +0x0 and +0x2).
+                        self.data[size_off..][..2].copy_from_slice(&count.to_le_bytes());
+                        self.data[size_off + 2..][..2].copy_from_slice(&count.to_le_bytes());
+                        // Class id string, e.g. `unit003_01_01` (13 bytes + NUL).
+                        let cid = format!("unit{num:03}_01_01");
+                        self.data[class_off..class_off + cid.len()].copy_from_slice(cid.as_bytes());
+                        self.data[class_off + cid.len()] = 0;
+                        // Class hash: take it from the squad's front unit's record.
+                        let front = self.unit_record(members[0]).expect("front is filled");
+                        let hash: [u8; 4] = self.data[front + layout::RECORD_SQUAD_HASH..][..4]
+                            .try_into()
+                            .expect("4 bytes");
+                        self.data[hash_off..][..4].copy_from_slice(&hash);
+                    }
+                    None => {
+                        // Unused slot: zero the size, class id and hash.
+                        self.data[size_off..][..4].fill(0);
+                        self.data[class_off..class_off + 14].fill(0);
+                        self.data[hash_off..][..4].fill(0);
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// The id of unit `index`'s equipped weapon (for example `"wpn004_008_01"`),
     /// or `None` if the slot is empty or holds no weapon.
     pub fn unit_weapon(&self, index: usize) -> Option<&str> {
@@ -1597,12 +1805,12 @@ fn unit_class_name(id: &[u8]) -> &'static str {
 /// of [`unit_class_name`] — or `None` if it is not one of the six classes.
 fn class_to_unit_num(class: &str) -> Option<u16> {
     match class.to_ascii_lowercase().as_str() {
-        "yumipon" => Some(2),
-        "tatepon" => Some(3),
-        "yaripon" => Some(4),
-        "kibapon" => Some(6),
-        "dekapon" => Some(7),
-        "megapon" => Some(8),
+        "yumipon" | "yumi" => Some(2),
+        "tatepon" | "tate" => Some(3),
+        "yaripon" | "yari" => Some(4),
+        "kibapon" | "kiba" => Some(6),
+        "dekapon" | "deka" => Some(7),
+        "megapon" | "mega" => Some(8),
         _ => None,
     }
 }
