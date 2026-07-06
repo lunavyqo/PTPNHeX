@@ -290,6 +290,30 @@ enum Command {
         #[arg(long, value_name = "DIR")]
         backup_dir: Option<PathBuf>,
     },
+    /// Set the mission-prep **picked stew**: `gnarly`, `tasty`, `kings`, `divine`,
+    /// or `none`. (The slot must be open — see `set-loadout-slots`.)
+    SetStew {
+        /// Path to the save directory.
+        dir: PathBuf,
+        /// Stew: gnarly, tasty, kings, divine, or none.
+        stew: String,
+        /// Copy the original files into this directory before saving.
+        /// Must be outside the save directory.
+        #[arg(long, value_name = "DIR")]
+        backup_dir: Option<PathBuf>,
+    },
+    /// Set the mission-prep **picked miracle**: `rain`, `tailwind`, `storm`, or
+    /// `earthquake`. (The slot must be open — see `set-loadout-slots`.)
+    SetMiracle {
+        /// Path to the save directory.
+        dir: PathBuf,
+        /// Miracle: rain, tailwind, storm, or earthquake.
+        miracle: String,
+        /// Copy the original files into this directory before saving.
+        /// Must be outside the save directory.
+        #[arg(long, value_name = "DIR")]
+        backup_dir: Option<PathBuf>,
+    },
     /// Force every confirmed unlock: all drums, buildable units, missions, and
     /// boss missions (does not open the loadout slots — use `set-loadout-slots`).
     UnlockAll {
@@ -504,6 +528,16 @@ fn main() -> Result<()> {
             state,
             backup_dir,
         } => set_loadout_slots(&dir, &state, backup_dir.as_deref()),
+        Command::SetStew {
+            dir,
+            stew,
+            backup_dir,
+        } => set_stew(&dir, &stew, backup_dir.as_deref()),
+        Command::SetMiracle {
+            dir,
+            miracle,
+            backup_dir,
+        } => set_miracle(&dir, &miracle, backup_dir.as_deref()),
         Command::UnlockAll { dir, backup_dir } => unlock_all(&dir, backup_dir.as_deref()),
         Command::BonusPatapons { dir } => bonus_patapons(&dir),
         Command::SetBonusPatapon {
@@ -1079,6 +1113,59 @@ fn set_loadout_slots(dir: &Path, state: &str, backup_dir: Option<&Path>) -> Resu
         "Mission-prep loadout slots: {}",
         if open_slots { "open" } else { "closed" }
     );
+    Ok(())
+}
+
+/// The four stews, index-for-index with the picked-stew field.
+const STEWS: [(&str, &str); 4] = [
+    ("gnarly", "Gnarly Stew"),
+    ("tasty", "Tasty Stew"),
+    ("kings", "King's Stew"),
+    ("divine", "Divine Stew"),
+];
+/// The four miracles, index-for-index with the picked-miracle field.
+const MIRACLES: [(&str, &str); 4] = [
+    ("rain", "Rain Miracle"),
+    ("tailwind", "Tailwind Miracle"),
+    ("storm", "Storm Miracle"),
+    ("earthquake", "Earthquake Miracle"),
+];
+
+fn set_stew(dir: &Path, stew: &str, backup_dir: Option<&Path>) -> Result<()> {
+    let choice = if stew.eq_ignore_ascii_case("none") {
+        None
+    } else {
+        let i = STEWS
+            .iter()
+            .position(|(slug, _)| stew.eq_ignore_ascii_case(slug))
+            .with_context(|| {
+                let names = STEWS.map(|(s, _)| s).join(", ");
+                format!("unknown stew `{stew}` (choices: {names}, none)")
+            })?;
+        Some(i as u8)
+    };
+    let mut slot = open(dir)?;
+    slot.set_picked_stew(choice)?;
+    back_up_and_save(&slot, backup_dir)?;
+    println!(
+        "Picked stew: {}",
+        choice.map_or("none", |i| STEWS[i as usize].1)
+    );
+    Ok(())
+}
+
+fn set_miracle(dir: &Path, miracle: &str, backup_dir: Option<&Path>) -> Result<()> {
+    let i = MIRACLES
+        .iter()
+        .position(|(slug, _)| miracle.eq_ignore_ascii_case(slug))
+        .with_context(|| {
+            let names = MIRACLES.map(|(s, _)| s).join(", ");
+            format!("unknown miracle `{miracle}` (choices: {names})")
+        })?;
+    let mut slot = open(dir)?;
+    slot.set_picked_miracle(i as u8)?;
+    back_up_and_save(&slot, backup_dir)?;
+    println!("Picked miracle: {}", MIRACLES[i].1);
     Ok(())
 }
 

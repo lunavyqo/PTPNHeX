@@ -357,6 +357,45 @@ pub fn loadout_slots_offset(region: Region) -> Option<usize> {
     }
 }
 
+/// Sentinel [`picked_stew_offset`] value meaning "no stew equipped".
+pub const PICKED_STEW_NONE: u32 = u32::MAX;
+
+/// Offset of the mission-prep **picked stew** selection (`u32` LE) for `region`:
+/// an index into the four stews — `0` Gnarly, `1` Tasty, `2` King's, `3` Divine
+/// (catalog order) — or [`PICKED_STEW_NONE`] for no stew. Confirmed for Europe at
+/// `0x30150` by a before/after save diff (see `docs/save-format.md`).
+pub fn picked_stew_offset(region: Region) -> Option<usize> {
+    match region {
+        Region::Europe => Some(0x30150),
+        Region::NorthAmerica | Region::Japan => None,
+    }
+}
+
+/// Offset of the mission-prep **picked miracle** selection (`u8`) for `region`:
+/// `0` Rain, `1` Tailwind, `2` Storm, `3` Earthquake (catalog order). Confirmed for
+/// Europe at `0x3014C` by the same before/after diff.
+pub fn picked_miracle_offset(region: Region) -> Option<usize> {
+    match region {
+        Region::Europe => Some(0x3014C),
+        Region::NorthAmerica | Region::Japan => None,
+    }
+}
+
+/// Value written to the [`mission_prep_flag_offset`] byte once the mission-prep
+/// screen has been configured (a deployment / stew / miracle set).
+pub const MISSION_PREP_SET: u8 = 0x07;
+
+/// Offset of the "mission-prep configured" flag byte for `region`. The game sets it
+/// to [`MISSION_PREP_SET`] the first time you set up a mission (seen on both a
+/// deploy-rearrange and a stew/miracle pick); an editor writing a selection into a
+/// never-configured save should set it too.
+pub fn mission_prep_flag_offset(region: Region) -> Option<usize> {
+    match region {
+        Region::Europe => Some(0x1ACF4),
+        Region::NorthAmerica | Region::Japan => None,
+    }
+}
+
 /// `(offset, bit-pair mask)` for each bonus Patapon's revive flag for `region`,
 /// paired index-for-index with [`crate::save::bonus_patapon`]'s catalog.
 ///

@@ -374,6 +374,89 @@ impl SaveSlot {
         Ok(())
     }
 
+    /// Number of stews and of miracles (each `0..4`) a mission-prep pick may name.
+    const LOADOUT_CHOICES: u8 = 4;
+
+    /// The mission-prep **picked stew** index (`0` Gnarly, `1` Tasty, `2` King's,
+    /// `3` Divine), or `None` if no stew is equipped or the region is unmapped.
+    pub fn picked_stew(&self) -> Option<u8> {
+        let off = crate::save::layout::picked_stew_offset(self.region)?;
+        let v = u32::from_le_bytes(self.data.get(off..off + 4)?.try_into().ok()?);
+        (v != crate::save::layout::PICKED_STEW_NONE).then_some(v as u8)
+    }
+
+    /// Sets the mission-prep **picked stew** by catalog index (`0..4`), or `None`
+    /// for no stew. Also marks the mission prep as configured.
+    ///
+    /// # Errors
+    /// - the index is out of range (`>= 4`);
+    /// - the region's mission-prep layout is unmapped.
+    pub fn set_picked_stew(&mut self, stew: Option<u8>) -> Result<()> {
+        if let Some(i) = stew {
+            if i >= Self::LOADOUT_CHOICES {
+                return Err(Error::Unsupported(format!(
+                    "stew index {i} out of range (0..{})",
+                    Self::LOADOUT_CHOICES
+                )));
+            }
+        }
+        let off = crate::save::layout::picked_stew_offset(self.region)
+            .filter(|&o| o + 4 <= self.data.len())
+            .ok_or_else(|| {
+                Error::Unsupported(format!(
+                    "mission-prep stew is not mapped for {}",
+                    self.region.serial()
+                ))
+            })?;
+        let v = stew.map_or(crate::save::layout::PICKED_STEW_NONE, u32::from);
+        self.data[off..off + 4].copy_from_slice(&v.to_le_bytes());
+        self.mark_mission_prep_configured();
+        Ok(())
+    }
+
+    /// The mission-prep **picked miracle** index (`0` Rain, `1` Tailwind, `2` Storm,
+    /// `3` Earthquake), or `None` if the region is unmapped.
+    pub fn picked_miracle(&self) -> Option<u8> {
+        let off = crate::save::layout::picked_miracle_offset(self.region)?;
+        self.data.get(off).copied()
+    }
+
+    /// Sets the mission-prep **picked miracle** by catalog index (`0..4`). Also marks
+    /// the mission prep as configured.
+    ///
+    /// # Errors
+    /// - the index is out of range (`>= 4`);
+    /// - the region's mission-prep layout is unmapped.
+    pub fn set_picked_miracle(&mut self, miracle: u8) -> Result<()> {
+        if miracle >= Self::LOADOUT_CHOICES {
+            return Err(Error::Unsupported(format!(
+                "miracle index {miracle} out of range (0..{})",
+                Self::LOADOUT_CHOICES
+            )));
+        }
+        let off = crate::save::layout::picked_miracle_offset(self.region)
+            .filter(|&o| o < self.data.len())
+            .ok_or_else(|| {
+                Error::Unsupported(format!(
+                    "mission-prep miracle is not mapped for {}",
+                    self.region.serial()
+                ))
+            })?;
+        self.data[off] = miracle;
+        self.mark_mission_prep_configured();
+        Ok(())
+    }
+
+    /// Sets the "mission-prep configured" flag, matching a save the game writes once
+    /// a deployment / stew / miracle has been set (best effort; skipped if unmapped).
+    fn mark_mission_prep_configured(&mut self) {
+        if let Some(off) = crate::save::layout::mission_prep_flag_offset(self.region) {
+            if off < self.data.len() {
+                self.data[off] |= crate::save::layout::MISSION_PREP_SET;
+            }
+        }
+    }
+
     /// Forces every confirmed progression unlock — all drums, every buildable
     /// unit type, the full mission list, and all boss missions — by OR-ing the
     /// unlock-accumulator masks into the save's unlock bitfields.

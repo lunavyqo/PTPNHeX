@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `set-stew` and `set-miracle` (and `SaveSlot::picked_stew` / `set_picked_stew`, `picked_miracle` /
+  `set_picked_miracle`): edit the **mission-prep loadout selection** — the picked stew (`gnarly`, `tasty`,
+  `kings`, `divine`, or `none`; `u32` at `0x30150`) and the picked miracle (`rain`, `tailwind`, `storm`,
+  `earthquake`; `u8` at `0x3014C`). Setting either also marks the mission-prep "configured" flag
+  (`0x1ACF4`). Mapped by a before/after save diff and hardware-confirmed on the EU release. The relevant
+  loadout slot must be open (`set-loadout-slots`).
+
 - Deploy sprite-crash guard: `set-class` now warns when it strands a **deployed** unit whose sprite
   class has no matching deployed squad — a save the game crashes on when a mission loads its assets
   (confirmed on hardware for Megapon and Kibapon). New `SaveSlot::deploy_sprite_conflicts` (the offending

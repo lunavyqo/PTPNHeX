@@ -729,6 +729,20 @@ only this bit restores both); with the slots open, which miracles are castable
 then follows from the miracle tokens in the inventory. The flag first sets early in
 the story (around the fifth mission) and persists thereafter.
 
+The **current selection** persists too, in a small mission-prep block near the
+battle formation:
+
+| offset | type | field |
+| --- | --- | --- |
+| `0x30150` | `u32` | **picked stew** — `0` Gnarly, `1` Tasty, `2` King's, `3` Divine (catalog order), or `0xFFFFFFFF` for no stew |
+| `0x3014C` | `u8` | **picked miracle** — `0` Rain, `1` Tailwind, `2` Storm, `3` Earthquake |
+| `0x1ACF4` | `u8` | a **"mission-prep configured"** flag, set to `0x07` once a deployment / stew / miracle is chosen |
+
+Both selections are the class-local catalog index (the same order as the stew items
+and the miracle key-items). Mapped by a before/after save diff and confirmed on
+hardware — writing the two fields (and the `0x1ACF4` flag) makes the prep screen show
+the chosen stew and miracle on the next load.
+
 Not yet fully decoded: the meaning of each *individual* unlock bit (which bit opens
 which specific mission/command).
 
